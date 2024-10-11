@@ -49,8 +49,13 @@ int main(int argc, char *argv[]) {
                 }
                 dup2(input_fd, STDIN_FILENO); // Redirect stdin from inputfile
                 dup2(pipe1[1], STDOUT_FILENO); // Connect stdout to pipe1
-                close(pipe1[0]); // Close unused read end of pipe1
-                close(input_fd); // Close the input file descriptor
+
+                // Close unused pipe ends
+                close(pipe1[0]);
+                close(pipe2[0]);
+                close(pipe2[1]);
+                close(input_fd);
+
                 setenv("CATFOOD", "yummy", 1); // Set environment variable
                 execl("/var/local/isse-07/kitty", "kitty", "-2", NULL);
                 perror("Exec failed");
@@ -60,8 +65,12 @@ int main(int argc, char *argv[]) {
             if (i == 1) { // kitty -3
                 dup2(pipe1[0], STDIN_FILENO); // Connect stdin to pipe1
                 dup2(pipe2[1], STDOUT_FILENO); // Connect stdout to pipe2
-                close(pipe1[1]); // Close unused write end of pipe1
-                close(pipe2[0]); // Close unused read end of pipe2
+
+                // Close unused pipe ends
+                close(pipe1[1]);
+                close(pipe2[0]);
+                close(pipe2[1]);
+
                 unsetenv("KITTYLITTER"); // Remove environment variable
                 execl("/var/local/isse-07/kitty", "kitty", "-3", NULL);
                 perror("Exec failed");
@@ -71,10 +80,15 @@ int main(int argc, char *argv[]) {
             if (i == 2) { // kitty -4
                 dup2(pipe2[0], STDIN_FILENO); // Connect stdin to pipe2
                 freopen(outputfile, "w", stdout); // Redirect stdout to outputfile
-                close(pipe2[1]); // Close unused write end of pipe2
+
+                // Close unused pipe ends
+                close(pipe1[1]);
+                close(pipe1[0]);
+                close(pipe2[1]);
+
                 setenv("CATFOOD", "yummy", 1); // Set environment variable
-                setenv("PATH", getenv("PATH"), 1); // Set PATH variable
-                setenv("HOME", getenv("HOME"), 1); // Set HOME variable
+                // Only set essential environment variables
+                // Remove others if not needed
                 execl("/var/local/isse-07/kitty", "kitty", "-4", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
