@@ -50,13 +50,15 @@ int main(int argc, char *argv[]) {
                 dup2(input_fd, STDIN_FILENO); // Redirect stdin from inputfile
                 dup2(pipe1[1], STDOUT_FILENO); // Connect stdout to pipe1
 
-                // Close unused pipe ends
+                // Close all file descriptors
                 close(pipe1[0]);
+                close(pipe1[1]);
                 close(pipe2[0]);
                 close(pipe2[1]);
                 close(input_fd);
 
                 setenv("CATFOOD", "yummy", 1); // Set environment variable
+                setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Set PATH
                 execl("/var/local/isse-07/kitty", "kitty", "-2", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
@@ -66,12 +68,14 @@ int main(int argc, char *argv[]) {
                 dup2(pipe1[0], STDIN_FILENO); // Connect stdin to pipe1
                 dup2(pipe2[1], STDOUT_FILENO); // Connect stdout to pipe2
 
-                // Close unused pipe ends
+                // Close all file descriptors
+                close(pipe1[0]);
                 close(pipe1[1]);
-                close(pipe2[0]);
                 close(pipe2[1]);
+                close(pipe2[0]);
 
                 unsetenv("KITTYLITTER"); // Remove environment variable
+                setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Set PATH
                 execl("/var/local/isse-07/kitty", "kitty", "-3", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
@@ -81,14 +85,14 @@ int main(int argc, char *argv[]) {
                 dup2(pipe2[0], STDIN_FILENO); // Connect stdin to pipe2
                 freopen(outputfile, "w", stdout); // Redirect stdout to outputfile
 
-                // Close unused pipe ends
-                close(pipe1[1]);
+                // Close all file descriptors
                 close(pipe1[0]);
+                close(pipe1[1]);
+                close(pipe2[0]);
                 close(pipe2[1]);
 
                 setenv("CATFOOD", "yummy", 1); // Set environment variable
-                // Only set essential environment variables
-                // Remove others if not needed
+                setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Set PATH
                 execl("/var/local/isse-07/kitty", "kitty", "-4", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
