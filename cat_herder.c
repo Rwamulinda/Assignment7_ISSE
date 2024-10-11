@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
                 close(pipe1[0]); // Close unused read end of pipe1
                 close(input_fd); // Close the input file descriptor
                 setenv("CATFOOD", "yummy", 1); // Set environment variable
-                execlp("kitty", "kitty", "-2", NULL);
+                execl("/var/local/isse-07/kitty", "kitty", "-2", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
             }
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
                 close(pipe1[1]); // Close unused write end of pipe1
                 close(pipe2[0]); // Close unused read end of pipe2
                 unsetenv("KITTYLITTER"); // Remove environment variable
-                execlp("kitty", "kitty", "-3", NULL);
+                execl("/var/local/isse-07/kitty", "kitty", "-3", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
             }
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
                 setenv("CATFOOD", "yummy", 1); // Set environment variable
                 setenv("PATH", getenv("PATH"), 1); // Set PATH variable
                 setenv("HOME", getenv("HOME"), 1); // Set HOME variable
-                execlp("kitty", "kitty", "-4", NULL);
+                execl("/var/local/isse-07/kitty", "kitty", "-4", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
             }
