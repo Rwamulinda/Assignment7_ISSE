@@ -57,9 +57,14 @@ int main(int argc, char *argv[]) {
                 close(pipe2[1]);
                 close(input_fd);
 
-                setenv("CATFOOD", "yummy", 1); // Set environment variable
-                setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Set PATH
-                execl("/var/local/isse-07/kitty", "kitty", "-2", NULL);
+                // Set environment variable for kitty -2
+                char *args[] = {"kitty", "-2", NULL};
+                char *env[] = {
+                    "CATFOOD=yummy",
+                    "PATH=/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    NULL // End of array
+                };
+                execve("/var/local/isse-07/kitty", args, env);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
             }
@@ -74,9 +79,13 @@ int main(int argc, char *argv[]) {
                 close(pipe2[1]);
                 close(pipe2[0]);
 
-                // No need to set CATFOOD or PATH again
-                unsetenv("KITTYLITTER"); // Remove environment variable
-                execl("/var/local/isse-07/kitty", "kitty", "-3", NULL);
+                // Set environment variable for kitty -3
+                char *args[] = {"kitty", "-3", NULL};
+                char *env[] = {
+                    "PATH=/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    NULL // End of array
+                };
+                execve("/var/local/isse-07/kitty", args, env);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
             }
@@ -91,8 +100,14 @@ int main(int argc, char *argv[]) {
                 close(pipe2[0]);
                 close(pipe2[1]);
 
-                setenv("CATFOOD", "yummy", 1); // Set environment variable for the last command
-                execl("/var/local/isse-07/kitty", "kitty", "-4", NULL);
+                // Set environment variable for kitty -4
+                char *args[] = {"kitty", "-4", NULL};
+                char *env[] = {
+                    "CATFOOD=yummy",
+                    "PATH=/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    NULL // End of array
+                };
+                execve("/var/local/isse-07/kitty", args, env);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
             }
