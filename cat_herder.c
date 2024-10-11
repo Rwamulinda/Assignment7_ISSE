@@ -74,8 +74,8 @@ int main(int argc, char *argv[]) {
                 close(pipe2[1]);
                 close(pipe2[0]);
 
+                // No need to set CATFOOD or PATH again
                 unsetenv("KITTYLITTER"); // Remove environment variable
-                setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Set PATH
                 execl("/var/local/isse-07/kitty", "kitty", "-3", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
@@ -91,8 +91,7 @@ int main(int argc, char *argv[]) {
                 close(pipe2[0]);
                 close(pipe2[1]);
 
-                setenv("CATFOOD", "yummy", 1); // Set environment variable
-                setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Set PATH
+                setenv("CATFOOD", "yummy", 1); // Set environment variable for the last command
                 execl("/var/local/isse-07/kitty", "kitty", "-4", NULL);
                 perror("Exec failed");
                 exit(EXIT_FAILURE);
