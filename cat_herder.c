@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>  // Include this for open(), O_RDONLY, etc.
 
 // Error handling macro
 #define CHECK(cond, msg) if (cond) { perror(msg); exit(1); }
