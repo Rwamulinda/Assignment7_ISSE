@@ -7,7 +7,6 @@
 #include <fcntl.h>  // For open()
 
 void execute_kitty(char *args[], int input_fd, int output_fd) {
-    // Fork a child process
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork failed");
@@ -18,11 +17,11 @@ void execute_kitty(char *args[], int input_fd, int output_fd) {
         // Redirect input and output if needed
         if (input_fd != STDIN_FILENO) {
             dup2(input_fd, STDIN_FILENO);
-            close(input_fd);  // Close the original input file descriptor
+            close(input_fd);
         }
         if (output_fd != STDOUT_FILENO) {
             dup2(output_fd, STDOUT_FILENO);
-            close(output_fd);  // Close the original output file descriptor
+            close(output_fd);
         }
 
         // Execute the kitty process
@@ -81,16 +80,20 @@ int main(int argc, char *argv[]) {
 
     // Execute kitty -2, redirecting input from the input file and output to pipe1
     execute_kitty(args1, input_fd, pipe1[1]);
-    close(pipe1[1]);  // Parent closes the write-end of pipe1
+    // Parent closes the write-end of pipe1
+    close(pipe1[1]); 
 
     // Execute kitty -3, redirecting input from pipe1 and output to pipe2
     execute_kitty(args2, pipe1[0], pipe2[1]);
-    close(pipe1[0]);  // Parent closes the read-end of pipe1
-    close(pipe2[1]);  // Parent closes the write-end of pipe2
+    // Parent closes the read-end of pipe1 and write-end of pipe2
+    close(pipe1[0]);  
+    close(pipe2[1]);  
 
     // Execute kitty -4, redirecting input from pipe2 and output to the output file
     execute_kitty(args3, pipe2[0], output_fd);
-    close(pipe2[0]);  // Parent closes the read-end of pipe2
+    // Parent closes the read-end of pipe2 and the output file descriptor
+    close(pipe2[0]);  
+    close(output_fd); 
 
     // Wait for all children to exit
     int status;
