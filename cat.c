@@ -1,131 +1,59 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define MAX_CMD_LEN 256
+#define CAT_HERDER "kitty"
 
-void print_usage() {
-    fprintf(stderr, "Usage: cat-herder (inputfile) (outputfile)\n");
+void run_kitty(int runlevel) {
+    // Prepare arguments for execvp
+    char *args[3];
+    args[0] = CAT_HERDER;
+    args[1] = "-n"; // Set the runlevel argument
+    args[2] = NULL;
+
+    // Fork a child process to run kitty
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(1);
+    }
+
+    if (pid == 0) { // Child process
+        // Execute the kitty program
+        execvp(args[0], args);
+        perror("execvp"); // If execvp fails
+        exit(1);
+    } else { // Parent process
+        // Wait for the child to finish
+        int status;
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            int exit_status = WEXITSTATUS(status);
+            printf("kitty exited with status: %d\n", exit_status);
+        } else {
+            printf("kitty did not exit normally.\n");
+        }
+    }
 }
 
-int main(int argc, char *argv[]) {
-    // Check command line arguments
-    if (argc != 3) {
-        print_usage();
-        return EXIT_FAILURE;
+int main(int argc, char *argv[], char *envp[]) {
+    // Set environment variables before running kitty
+    setenv("CATFOOD", "yummy", 1);
+    unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is not set
+
+    // You can also verify if other required environment variables are set here
+    // Example: if (getenv("PATH") == NULL) { /* handle the error */ }
+
+    // Check for the runlevel from command-line arguments (default to 2 for this example)
+    int runlevel = 2; // You can modify this based on your needs
+    if (argc > 1) {
+        runlevel = atoi(argv[1]);
     }
 
-    const char *inputfile = argv[1];
-    const char *outputfile = argv[2];
+    // Run the kitty program
+    run_kitty(runlevel);
 
-    // Ensure input and output files are not the same
-    if (strcmp(inputfile, outputfile) == 0) {
-        fprintf(stderr, "Error: inputfile and outputfile cannot be the same.\n");
-        return EXIT_FAILURE;
-    }
-
-    // Create pipes for inter-process communication
-    int pipe1[2], pipe2[2];
-    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
-        perror("Pipe creation failed");
-        return EXIT_FAILURE;
-    }
-
-    for (int i = 0; i < 3; i++) {
-        pid_t pid = fork();
-        if (pid < 0) {
-            perror("Fork failed");
-            exit(EXIT_FAILURE);
-        } else if (pid == 0) { // Child process
-            if (i == 0) { // kitty -2
-                int input_fd = open(inputfile, O_RDONLY);
-                if (input_fd == -1) {
-                    perror("Opening input file failed");
-                    exit(EXIT_FAILURE);
-                }
-                dup2(input_fd, STDIN_FILENO); // Redirect stdin from inputfile
-                dup2(pipe1[1], STDOUT_FILENO); // Connect stdout to pipe1
-
-                // Close all file descriptors
-                close(pipe1[0]);
-                close(pipe1[1]);
-                close(pipe2[0]);
-                close(pipe2[1]);
-                close(input_fd);
-
-                // Set environment variable for kitty -2
-                char *args[] = {"kitty", "-2", NULL};
-                char *env[] = {
-                    "CATFOOD=yummy",
-                    "PATH=/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                    NULL // End of array
-                };
-                execve("/var/local/isse-07/kitty", args, env);
-                perror("Exec failed");
-                exit(EXIT_FAILURE);
-            }
-
-            if (i == 1) { // kitty -3
-                dup2(pipe1[0], STDIN_FILENO); // Connect stdin to pipe1
-                dup2(pipe2[1], STDOUT_FILENO); // Connect stdout to pipe2
-
-                // Close all file descriptors
-                close(pipe1[0]);
-                close(pipe1[1]);
-                close(pipe2[1]);
-                close(pipe2[0]);
-
-                // Set environment variable for kitty -3
-                char *args[] = {"kitty", "-3", NULL};
-                char *env[] = {
-                    "PATH=/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                    NULL // End of array
-                };
-                execve("/var/local/isse-07/kitty", args, env);
-                perror("Exec failed");
-                exit(EXIT_FAILURE);
-            }
-
-            if (i == 2) { // kitty -4
-                dup2(pipe2[0], STDIN_FILENO); // Connect stdin to pipe2
-                freopen(outputfile, "w", stdout); // Redirect stdout to outputfile
-
-                // Close all file descriptors
-                close(pipe1[0]);
-                close(pipe1[1]);
-                close(pipe2[0]);
-                close(pipe2[1]);
-
-                // Set environment variable for kitty -4
-                char *args[] = {"kitty", "-4", NULL};
-                char *env[] = {
-                    "CATFOOD=yummy",
-                    "PATH=/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-                    NULL // End of array
-                };
-                execve("/var/local/isse-07/kitty", args, env);
-                perror("Exec failed");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
-
-    // Parent process: close pipe ends
-    close(pipe1[1]);
-    close(pipe2[1]);
-
-    // Wait for all child processes to exit
-    int status;
-    for (int i = 0; i < 3; i++) {
-        wait(&status);
-        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-            return EXIT_FAILURE; // One of the children exited with non-zero status
-        }
-    }
-
-    return EXIT_SUCCESS; // All children exited successfully
+    return 0;
 }
