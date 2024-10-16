@@ -32,7 +32,7 @@ void execute_kitty(char *args[], int input_fd, int output_fd) {
         }
     } else {  // Parent process
         // Close the unused file descriptors in the parent
-        close(input_fd); 
+        close(input_fd);
         close(output_fd);
     }
 }
