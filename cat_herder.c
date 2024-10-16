@@ -4,93 +4,103 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
-#include <fcntl.h>  // Include this for open(), O_RDONLY, etc.
+#include <fcntl.h>  // For open()
 
-// Error handling macro
-#define CHECK(cond, msg) if (cond) { perror(msg); exit(1); }
-
-void run_kitty(const char *arg, char **env, int in_fd, int out_fd) {
-    // Redirect stdin and stdout using dup2()
-    if (in_fd != STDIN_FILENO) {
-        CHECK(dup2(in_fd, STDIN_FILENO) == -1, "dup2 in_fd");
-        close(in_fd);
-    }
-    if (out_fd != STDOUT_FILENO) {
-        CHECK(dup2(out_fd, STDOUT_FILENO) == -1, "dup2 out_fd");
-        close(out_fd);
+void execute_kitty(char *args[], int input_fd, int output_fd) {
+    // Fork a child process
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        exit(1);
     }
 
-    // Prepare arguments for execvp()
-    char *args[] = {"kitty", (char *)arg, NULL};
-    
-    // Execute kitty with the modified environment
-    execvp("kitty", args);
-    // If execvp returns, there was an error
-    perror("execvp failed");
-    exit(1);
+    if (pid == 0) {  // Child process
+        // Redirect input and output if needed
+        if (input_fd != STDIN_FILENO) {
+            dup2(input_fd, STDIN_FILENO);
+            close(input_fd);
+        }
+        if (output_fd != STDOUT_FILENO) {
+            dup2(output_fd, STDOUT_FILENO);
+            close(output_fd);
+        }
+
+        // Execute the kitty process
+        if (execvp(args[0], args) == -1) {
+            perror("execvp failed");
+            exit(1);
+        }
+    }
 }
 
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <inputfile> <outputfile>\n", argv[0]);
-        exit(1);
+        return 1;
     }
 
-    const char *inputfile = argv[1];
-    const char *outputfile = argv[2];
+    char *inputfile = argv[1];
+    char *outputfile = argv[2];
 
-    // Ensure inputfile and outputfile are not the same
     if (strcmp(inputfile, outputfile) == 0) {
-        fprintf(stderr, "Error: Input and output files cannot be the same\n");
-        exit(1);
+        fprintf(stderr, "Error: inputfile and outputfile cannot be the same.\n");
+        return 1;
     }
+
+    // Open input and output files
+    int input_fd = open(inputfile, O_RDONLY);
+    if (input_fd < 0) {
+        perror("Failed to open input file");
+        return 1;
+    }
+
+    int output_fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        perror("Failed to open output file");
+        close(input_fd);
+        return 1;
+    }
+
+    // Define the arguments for each kitty process
+    char *args1[] = {"/var/local/isse-07/kitty", "-2", NULL};
+    char *args2[] = {"/var/local/isse-07/kitty", "-3", NULL};
+    char *args3[] = {"/var/local/isse-07/kitty", "-4", NULL};
 
     // Create pipes
     int pipe1[2], pipe2[2];
-    CHECK(pipe(pipe1) == -1, "pipe1");
-    CHECK(pipe(pipe2) == -1, "pipe2");
-
-    pid_t pid1, pid2, pid3;
-
-    // Fork first child (kitty -2)
-    if ((pid1 = fork()) == 0) {
-        // Child 1 process
-        close(pipe1[0]); // Close unused read end
-        int input_fd = open(inputfile, O_RDONLY);
-        CHECK(input_fd == -1, "open inputfile");
-        run_kitty("-2", envp, input_fd, pipe1[1]);
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("pipe failed");
+        close(input_fd);
+        close(output_fd);
+        return 1;
     }
 
-    // Fork second child (kitty -3)
-    if ((pid2 = fork()) == 0) {
-        // Child 2 process
-        close(pipe1[1]); // Close unused write end
-        close(pipe2[0]); // Close unused read end
-        run_kitty("-3", envp, pipe1[0], pipe2[1]);
-    }
+    // Execute kitty -2, redirecting input from the input file and output to pipe1
+    execute_kitty(args1, input_fd, pipe1[1]);
+    close(pipe1[1]);  // Parent closes the write-end of pipe1
 
-    // Fork third child (kitty -4)
-    if ((pid3 = fork()) == 0) {
-        // Child 3 process
-        close(pipe2[1]); // Close unused write end
-        int output_fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        CHECK(output_fd == -1, "open outputfile");
-        run_kitty("-4", envp, pipe2[0], output_fd);
-    }
+    // Execute kitty -3, redirecting input from pipe1 and output to pipe2
+    execute_kitty(args2, pipe1[0], pipe2[1]);
+    close(pipe1[0]);  // Parent closes the read-end of pipe1
+    close(pipe2[1]);  // Parent closes the write-end of pipe2
 
-    // Close all pipes in the parent
-    close(pipe1[0]); close(pipe1[1]);
-    close(pipe2[0]); close(pipe2[1]);
+    // Execute kitty -4, redirecting input from pipe2 and output to the output file
+    execute_kitty(args3, pipe2[0], output_fd);
+    close(pipe2[0]);  // Parent closes the read-end of pipe2
+    close(output_fd); // Parent closes the output file descriptor
 
     // Wait for all children to exit
     int status;
-    int exit_code = 0;
     for (int i = 0; i < 3; ++i) {
-        wait(&status);
+        if (wait(&status) == -1) {
+            perror("wait failed");
+            return 1;
+        }
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-            exit_code = 1;
+            fprintf(stderr, "A child process exited with non-zero status\n");
+            return 1;
         }
     }
 
-    return exit_code;
+    return 0;
 }
