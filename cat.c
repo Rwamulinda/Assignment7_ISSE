@@ -41,10 +41,9 @@ void run_kitty(int runlevel) {
 int main(int argc, char *argv[], char *envp[]) {
     // Set environment variables before running kitty
     setenv("CATFOOD", "yummy", 1);
+    setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
+    setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
     unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is not set
-
-    // You can also verify if other required environment variables are set here
-    // Example: if (getenv("PATH") == NULL) { /* handle the error */ }
 
     // Check for the runlevel from command-line arguments (default to 2 for this example)
     int runlevel = 2; // You can modify this based on your needs
