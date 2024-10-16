@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define KITTYPATH "/var/local/isse-07/kitty" // Update this path
+#define KITTYPATH "/var/local/isse-07/kitty" // Ensure this is the correct path
 
 void run_kitty(const char *arg, char *envp[]) {
     char *args[3];
@@ -14,7 +14,7 @@ void run_kitty(const char *arg, char *envp[]) {
     args[1] = (char *)arg;
     args[2] = NULL;
 
-    execvp(args[0], args); // Use execvp instead of execve
+    execvp(args[0], args); // Use execvp
     perror("execvp"); // Only reached if execvp fails
     exit(1);
 }
@@ -34,8 +34,10 @@ int main(int argc, char *argv[], char *envp[]) {
     }
 
     int pipe1[2], pipe2[2];
-    pipe(pipe1);
-    pipe(pipe2);
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("pipe");
+        return 1;
+    }
 
     // Fork first child
     if (fork() == 0) {
@@ -48,7 +50,12 @@ int main(int argc, char *argv[], char *envp[]) {
         dup2(in_fd, STDIN_FILENO);
         close(in_fd);
 
-        // Run kitty -2
+        // Close unused pipe ends
+        close(pipe1[0]); // Close read end
+        close(pipe2[0]); // Close read end
+        close(pipe2[1]); // Close write end
+
+        // Run kitty -2 with environment
         run_kitty("-2", envp);
     }
 
@@ -57,10 +64,11 @@ int main(int argc, char *argv[], char *envp[]) {
         // Redirect stdin to the first pipe and stdout to the second pipe
         dup2(pipe1[0], STDIN_FILENO);
         dup2(pipe2[1], STDOUT_FILENO);
-        close(pipe1[1]);
-        close(pipe2[0]);
+        close(pipe1[1]); // Close write end
+        close(pipe1[0]); // Close read end
+        close(pipe2[0]); // Close read end
 
-        // Run kitty -3
+        // Run kitty -3 with environment
         run_kitty("-3", envp);
     }
 
@@ -68,16 +76,17 @@ int main(int argc, char *argv[], char *envp[]) {
     if (fork() == 0) {
         // Redirect stdin to the second pipe and stdout to outputfile
         dup2(pipe2[0], STDIN_FILENO);
+        close(pipe2[1]); // Close write end
+
         int out_fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (out_fd < 0) {
             perror("open outputfile");
             exit(1);
         }
         dup2(out_fd, STDOUT_FILENO);
-        close(pipe2[1]);
         close(out_fd);
 
-        // Run kitty -4
+        // Run kitty -4 with environment
         run_kitty("-4", envp);
     }
 
