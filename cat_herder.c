@@ -18,11 +18,11 @@ void execute_kitty(char *args[], int input_fd, int output_fd) {
         // Redirect input and output if needed
         if (input_fd != STDIN_FILENO) {
             dup2(input_fd, STDIN_FILENO);
-            close(input_fd);
+            close(input_fd);  // Close the original input file descriptor
         }
         if (output_fd != STDOUT_FILENO) {
             dup2(output_fd, STDOUT_FILENO);
-            close(output_fd);
+            close(output_fd);  // Close the original output file descriptor
         }
 
         // Execute the kitty process
@@ -30,6 +30,10 @@ void execute_kitty(char *args[], int input_fd, int output_fd) {
             perror("execvp failed");
             exit(1);
         }
+    } else {  // Parent process
+        // Close the unused file descriptors in the parent
+        close(input_fd); 
+        close(output_fd);
     }
 }
 
@@ -87,7 +91,6 @@ int main(int argc, char *argv[]) {
     // Execute kitty -4, redirecting input from pipe2 and output to the output file
     execute_kitty(args3, pipe2[0], output_fd);
     close(pipe2[0]);  // Parent closes the read-end of pipe2
-    close(output_fd); // Parent closes the output file descriptor
 
     // Wait for all children to exit
     int status;
