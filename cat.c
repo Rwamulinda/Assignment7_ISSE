@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define KITTYPATH "/var/local/isse-07/kitty" // Ensure this is the correct path
+#define KITTYPATH "home/puwase/var/local/isse-07/kitty" // Ensure this is the correct path
 
 void run_kitty(const char *arg, char *envp[]) {
     char *args[3];
