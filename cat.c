@@ -6,16 +6,16 @@
 #include <fcntl.h>
 #include <string.h>
 
-#define KITTYPATH "kitty"
+#define KITTYPATH "/var/local/isse-07/kitty" // Update this path
 
 void run_kitty(const char *arg, char *envp[]) {
     char *args[3];
-    args[0] = KITTYPATH;
+    args[0] = KITTYPATH; // Full path to kitty
     args[1] = (char *)arg;
     args[2] = NULL;
 
-    execve(KITTYPATH, args, envp);
-    perror("execve"); // Only reached if execve fails
+    execvp(args[0], args); // Use execvp instead of execve
+    perror("execvp"); // Only reached if execvp fails
     exit(1);
 }
 
@@ -41,6 +41,10 @@ int main(int argc, char *argv[], char *envp[]) {
     if (fork() == 0) {
         // Redirect stdin to inputfile
         int in_fd = open(inputfile, O_RDONLY);
+        if (in_fd < 0) {
+            perror("open inputfile");
+            exit(1);
+        }
         dup2(in_fd, STDIN_FILENO);
         close(in_fd);
 
@@ -65,6 +69,10 @@ int main(int argc, char *argv[], char *envp[]) {
         // Redirect stdin to the second pipe and stdout to outputfile
         dup2(pipe2[0], STDIN_FILENO);
         int out_fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (out_fd < 0) {
+            perror("open outputfile");
+            exit(1);
+        }
         dup2(out_fd, STDOUT_FILENO);
         close(pipe2[1]);
         close(out_fd);
