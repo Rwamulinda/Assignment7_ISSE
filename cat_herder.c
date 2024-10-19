@@ -25,14 +25,14 @@ void setup_environment(int child_index) {
     // Set specific environment variables based on child index
     if (child_index == 0) { // First child
         setenv("CATFOOD", "yummy", 1);
-        setenv("HOME", "/nonexistent", 1); // Set HOME to expected value
+        setenv("HOME", "/home/puwase", 1); // Set HOME to the expected value
         setenv("PATH", EXPECTED_PATH, 1);
     } else if (child_index == 1) { // Second child
-        setenv("HOME", "/nonexistent", 1); // Set HOME to expected value
+        setenv("HOME", "/home/puwase", 1); // Set HOME to the expected value
         setenv("PATH", EXPECTED_PATH, 1);
     } else if (child_index == 2) { // Third child
         setenv("CATFOOD", "yummy", 1);
-        setenv("HOME", "/nonexistent", 1); // Set HOME to expected value
+        setenv("HOME", "/home/puwase", 1); // Set HOME to the expected value
         setenv("PATH", EXPECTED_PATH, 1);
     }
 }
