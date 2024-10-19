@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-#define KITTY_EXEC "/var/local/isse-07/kitty"  // Define the full path to the kitty executable
+#define KITTY_EXEC "/var/local/isse-07/kitty"  // Path to the kitty executable
 
 int main() {
     pid_t pid[3];  // Store PIDs of the three child processes
@@ -28,20 +28,24 @@ int main() {
         }
 
         if (pid[i] == 0) {  // Child process
-            // Set the PATH environment variable to include the expected directories
-            setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
-
-            // Set the CATFOOD environment variable
+            // Set environment variables
+            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
             setenv("CATFOOD", "yummy", 1);  // You can change "yummy" to any appropriate value
 
             // Handle input from the previous pipe (if applicable)
             if (i > 0) {
-                dup2(pipefd[i - 1][0], STDIN_FILENO);  // Read from previous pipe
+                if (dup2(pipefd[i - 1][0], STDIN_FILENO) == -1) {  // Read from previous pipe
+                    perror("dup2");
+                    exit(EXIT_FAILURE);
+                }
             }
 
             // Handle output to the next pipe (if applicable)
             if (i < 2) {
-                dup2(pipefd[i][1], STDOUT_FILENO);  // Write to next pipe
+                if (dup2(pipefd[i][1], STDOUT_FILENO) == -1) {  // Write to next pipe
+                    perror("dup2");
+                    exit(EXIT_FAILURE);
+                }
             }
 
             // Close all pipe file descriptors
@@ -55,7 +59,6 @@ int main() {
             snprintf(arg, sizeof(arg), "-%d", i);  // Format "-0", "-1", "-2"
 
             execl(KITTY_EXEC, "kitty", arg, NULL);
-
             // If execl fails, print an error and exit
             perror("execl");
             exit(EXIT_FAILURE);
