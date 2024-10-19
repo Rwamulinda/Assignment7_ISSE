@@ -29,7 +29,8 @@ int main() {
 
         if (pid[i] == 0) {  // Child process
             // Set the PATH environment variable to include /home/puwase
-            setenv("PATH", "/home/puwase:/usr/bin:/bin", 1);
+            // Set the PATH environment variable to include /home/puwase and other directories
+            setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
 
             // Set the CATFOOD environment variable
             setenv("CATFOOD", "yummy", 1);  // You can change "yummy" to any appropriate value
