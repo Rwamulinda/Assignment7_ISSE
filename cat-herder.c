@@ -4,11 +4,19 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
-// Define the full path to the kitty executable
-#define KITTY_EXEC "/var/local/isse-07/kitty"
+#define KITTY_EXEC "/var/local/isse-07/kitty"  // Define the full path to the kitty executable
 
 int main() {
     pid_t pid[3];  // Store PIDs of the three child processes
+    int pipefd[2][2];  // Two pipes for three processes
+
+    // Create pipes
+    for (int i = 0; i < 2; i++) {
+        if (pipe(pipefd[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // Create three child processes
     for (int i = 0; i < 3; i++) {
@@ -16,7 +24,7 @@ int main() {
 
         if (pid[i] < 0) {
             perror("fork");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         if (pid[i] == 0) {  // Child process
@@ -24,7 +32,23 @@ int main() {
             setenv("PATH", "/home/puwase:/usr/bin:/bin", 1);
 
             // Set the CATFOOD environment variable
-            setenv("CATFOOD", "yummy", 1);  // You can change "tuna" to any appropriate value
+            setenv("CATFOOD", "yummy", 1);  // You can change "yummy" to any appropriate value
+
+            // Handle input from the previous pipe (if applicable)
+            if (i > 0) {
+                dup2(pipefd[i - 1][0], STDIN_FILENO);  // Read from previous pipe
+            }
+
+            // Handle output to the next pipe (if applicable)
+            if (i < 2) {
+                dup2(pipefd[i][1], STDOUT_FILENO);  // Write to next pipe
+            }
+
+            // Close all pipe file descriptors
+            for (int j = 0; j < 2; j++) {
+                close(pipefd[j][0]);
+                close(pipefd[j][1]);
+            }
 
             // Use execl to run /var/local/isse-07/kitty with an argument indicating the child number
             char arg[3];
@@ -34,8 +58,13 @@ int main() {
 
             // If execl fails, print an error and exit
             perror("execl");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
+    }
+
+    // Close all pipe write ends in the parent process
+    for (int i = 0; i < 2; i++) {
+        close(pipefd[i][1]);
     }
 
     // Parent process: Wait for all child processes to complete
@@ -45,7 +74,7 @@ int main() {
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(1);  // Exit if any child failed
+            exit(EXIT_FAILURE);  // Exit if any child failed
         }
     }
 
