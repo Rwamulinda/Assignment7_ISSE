@@ -8,6 +8,7 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 #define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
+#define HOME_DIR "/home/puwase"  // Set HOME to the expected directory
 
 // Function to close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
@@ -17,18 +18,14 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
-// Function to set only required environment variables
-void setup_environment() {
-    clearenv(); // Clear all environment variables
-    setenv("HOME", "/nonexistent", 1); // Set HOME to /nonexistent
-    setenv("PATH", EXPECTED_PATH, 1); // Set PATH to the expected path
-    // Set CATFOOD only in specific child processes if needed
-}
+// Function to set the required environment variables
+void setup_environment(int child_index) {
+    clearenv();  // Clear all existing environment variables
+    setenv("HOME", HOME_DIR, 1);  // Set HOME to /home/puwase
+    setenv("PATH", EXPECTED_PATH, 1);  // Set PATH to the expected path
 
-// Function to setup environment for the child process based on the index
-void setup_child_environment(int child_index) {
-    setup_environment(); // Call the function to set basic environment variables
-    if (child_index == 0 || child_index == 2) { // Only set CATFOOD for these children
+    // Set CATFOOD only for the first and third child
+    if (child_index == 0 || child_index == 2) {
         setenv("CATFOOD", "yummy", 1);
     }
 }
@@ -64,43 +61,43 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < 3; i++) {
         pid[i] = fork();
 
-        if (pid[i] < 0) { // Fork error
+        if (pid[i] < 0) {  // Fork error
             perror("fork");
             close_all_pipes(pipefd);
             close(out_fd);
             exit(EXIT_FAILURE);
         }
 
-        if (pid[i] == 0) { // Child process
-            setup_child_environment(i); // Set up environment variables
+        if (pid[i] == 0) {  // Child process
+            setup_environment(i);  // Set up environment variables
 
             // Redirect input
-            if (i == 0) { // First child reads from the input file
+            if (i == 0) {  // First child reads from the input file
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
                     exit(EXIT_FAILURE);
                 }
                 dup2(in_fd, STDIN_FILENO);
-                close(in_fd);  // Close after redirection
-            } else { // Other children read from the previous pipe
+                close(in_fd);
+            } else {  // Other children read from the previous pipe
                 dup2(pipefd[i - 1][0], STDIN_FILENO);
             }
 
             // Redirect output
-            if (i < 2) { // First two children write to the next pipe
+            if (i < 2) {  // First two children write to the next pipe
                 dup2(pipefd[i][1], STDOUT_FILENO);
-            } else { // Last child writes to the output file
+            } else {  // Last child writes to the output file
                 dup2(out_fd, STDOUT_FILENO);
             }
 
             // Close all pipes in the child process
             close_all_pipes(pipefd);
-            close(out_fd); // Ensure output file is closed
+            close(out_fd);
 
             // Execute the kitty command
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i + 2); // Correct command line argument
+            snprintf(arg, sizeof(arg), "-%d", i + 2);
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
             // If exec fails
@@ -111,7 +108,7 @@ int main(int argc, char *argv[]) {
 
     // Parent process: Close all pipe write ends
     close_all_pipes(pipefd);
-    close(out_fd); // Close output file in parent
+    close(out_fd);
 
     // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
@@ -120,7 +117,7 @@ int main(int argc, char *argv[]) {
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(EXIT_FAILURE); // Exit if any child fails
+            exit(EXIT_FAILURE);  // Exit if any child fails
         }
     }
 
