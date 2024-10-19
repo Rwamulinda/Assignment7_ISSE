@@ -7,6 +7,13 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
+void close_all_pipes(int pipefd[2][2]) {
+    for (int i = 0; i < 2; i++) {
+        close(pipefd[i][0]);
+        close(pipefd[i][1]);
+    }
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
@@ -15,8 +22,8 @@ int main(int argc, char *argv[]) {
 
     const char *input_file = argv[1];
     const char *output_file = argv[2];
-    pid_t pid[3];         // Store PIDs of child processes
-    int pipefd[2][2];      // Two pipes for three processes
+    pid_t pid[3];  // Store PIDs of child processes
+    int pipefd[2][2];  // Two pipes for communication
 
     // Create pipes
     for (int i = 0; i < 2; i++) {
@@ -26,73 +33,70 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Open output file
+    // Open the output file
     int out_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (out_fd == -1) {
         perror("open output file");
+        close_all_pipes(pipefd);  // Ensure pipes are closed on error
         exit(EXIT_FAILURE);
     }
 
-    // Fork child processes
+    // Fork three child processes
     for (int i = 0; i < 3; i++) {
         pid[i] = fork();
 
-        if (pid[i] < 0) {
+        if (pid[i] < 0) {  // Fork error
             perror("fork");
+            close_all_pipes(pipefd);
+            close(out_fd);
             exit(EXIT_FAILURE);
         }
 
         if (pid[i] == 0) {  // Child process
             // Set environment variables
             setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
-            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
+            //setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
             setenv("CATFOOD", "yummy", 1);
 
-            // Set up input redirection
-            if (i == 0) {  // First child reads from input file
+            // Redirect input
+            if (i == 0) {  // First child reads from the input file
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
+                    close_all_pipes(pipefd);
                     exit(EXIT_FAILURE);
                 }
                 dup2(in_fd, STDIN_FILENO);
-                close(in_fd);  // Close after redirecting
+                close(in_fd);  // Close after redirection
             } else {  // Other children read from the previous pipe
                 dup2(pipefd[i - 1][0], STDIN_FILENO);
             }
 
-            // Set up output redirection
+            // Redirect output
             if (i < 2) {  // First two children write to the next pipe
                 dup2(pipefd[i][1], STDOUT_FILENO);
             } else {  // Last child writes to the output file
                 dup2(out_fd, STDOUT_FILENO);
             }
 
-            // Close all unused pipe ends in the child
-            for (int j = 0; j < 2; j++) {
-                close(pipefd[j][0]);
-                close(pipefd[j][1]);
-            }
+            // Close all pipes in the child process
+            close_all_pipes(pipefd);
+            close(out_fd);  // Ensure output file is closed
 
-            // Execute kitty with the appropriate argument
+            // Execute the kitty command
             char arg[3];
             snprintf(arg, sizeof(arg), "-%d", i);
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
-            // If exec fails, print error and exit
+            // If exec fails
             perror("execl");
             exit(EXIT_FAILURE);
         }
     }
 
-    // Parent closes all pipe ends
-    for (int i = 0; i < 2; i++) {
-        close(pipefd[i][0]);
-        close(pipefd[i][1]);
-    }
-
-    // Close output file descriptor in parent
-    close(out_fd);
+    // Parent process: Close all pipes
+    close_all_pipes(pipefd);
+    close(out_fd);  // Close output file in parent
 
     // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
