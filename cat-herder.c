@@ -18,12 +18,15 @@ void close_all_pipes(int pipefd[2][2]) {
 
 // Function to set only required environment variables
 void setup_environment(int child_index) {
-    // Clear unnecessary environment variables
-    unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
+    // Clear all unnecessary environment variables
+    unsetenv("KITTYLITTER");
 
     // Set specific environment variables based on child index
     if (child_index == 0) { // kitty -2
         setenv("CATFOOD", "yummy", 1);
+        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
+    } else if (child_index == 1) { // kitty -3
+        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
     } else if (child_index == 2) { // kitty -4
         setenv("CATFOOD", "yummy", 1);
         setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
@@ -99,7 +102,7 @@ int main(int argc, char *argv[]) {
 
             // Execute the kitty command
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i + 2); // Correct command line argument
+            snprintf(arg, sizeof(arg), "-%d", i + 2); // Adjust command line argument
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
             // If exec fails
