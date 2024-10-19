@@ -44,38 +44,36 @@ int main(int argc, char *argv[]) {
 
         if (pid[i] == 0) {  // Child process
             // Set environment variables
-            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
-            setenv("CATFOOD", "yummy", 1);  // You can change "yummy" to any appropriate value
+            setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
+            setenv("CATFOOD", "yummy", 1);
 
-            // Handle input from the previous pipe (if applicable)
+            // Handle input from the previous pipe or input file
             if (i > 0) {
-                if (dup2(pipefd[i - 1][0], STDIN_FILENO) == -1) {  // Read from previous pipe
+                if (dup2(pipefd[i - 1][0], STDIN_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
             } else {
-                // Read from the input file for the first child
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
                     exit(EXIT_FAILURE);
                 }
-                if (dup2(in_fd, STDIN_FILENO) == -1) {  // Read from input file
+                if (dup2(in_fd, STDIN_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
-                close(in_fd);  // Close the input file descriptor
+                close(in_fd);
             }
 
-            // Handle output to the next pipe (if applicable)
+            // Handle output to the next pipe or output file
             if (i < 2) {
-                if (dup2(pipefd[i][1], STDOUT_FILENO) == -1) {  // Write to next pipe
+                if (dup2(pipefd[i][1], STDOUT_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
             } else {
-                // Write to the output file for the last child
-                if (dup2(out_fd, STDOUT_FILENO) == -1) {  // Write to output file
+                if (dup2(out_fd, STDOUT_FILENO) == -1) {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
@@ -87,18 +85,17 @@ int main(int argc, char *argv[]) {
                 close(pipefd[j][1]);
             }
 
-            // Use execl to run /var/local/isse-07/kitty with an argument indicating the child number
+            // Execute kitty with the appropriate argument
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i);  // Format "-0", "-1", "-2"
+            snprintf(arg, sizeof(arg), "-%d", i);
 
             execl(KITTY_EXEC, "kitty", arg, NULL);
-            // If execl fails, print an error and exit
             perror("execl");
             exit(EXIT_FAILURE);
         }
     }
 
-    // Close all pipe write ends in the parent process
+    // Close pipe write ends in the parent process
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][1]);
     }
@@ -106,14 +103,14 @@ int main(int argc, char *argv[]) {
     // Close the output file descriptor in the parent process
     close(out_fd);
 
-    // Parent process: Wait for all child processes to complete
+    // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
         int status;
-        waitpid(pid[i], &status, 0);  // Wait for each child to complete
+        waitpid(pid[i], &status, 0);
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(EXIT_FAILURE);  // Exit if any child failed
+            exit(EXIT_FAILURE);
         }
     }
 
