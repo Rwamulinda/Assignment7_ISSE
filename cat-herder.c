@@ -24,7 +24,7 @@ int main() {
             setenv("PATH", "/home/puwase:/usr/bin:/bin", 1);
 
             // Set the CATFOOD environment variable
-            setenv("CATFOOD", "tuna", 1);  // You can change "tuna" to any appropriate value
+            setenv("CATFOOD", "yummy", 1);  // You can change "tuna" to any appropriate value
 
             // Use execl to run /var/local/isse-07/kitty with an argument indicating the child number
             char arg[3];
