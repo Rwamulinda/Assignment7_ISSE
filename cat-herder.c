@@ -22,8 +22,8 @@ int main(int argc, char *argv[]) {
 
     const char *input_file = argv[1];
     const char *output_file = argv[2];
-    pid_t pid[3];  // Store PIDs of child processes
-    int pipefd[2][2];  // Two pipes for communication
+    pid_t pid[3];
+    int pipefd[2][2];
 
     // Create pipes
     for (int i = 0; i < 2; i++) {
@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     int out_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (out_fd == -1) {
         perror("open output file");
-        close_all_pipes(pipefd);  // Ensure pipes are closed on error
+        close_all_pipes(pipefd);
         exit(EXIT_FAILURE);
     }
 
@@ -45,25 +45,30 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < 3; i++) {
         pid[i] = fork();
 
-        if (pid[i] < 0) {  // Fork error
+        if (pid[i] < 0) { // Fork error
             perror("fork");
             close_all_pipes(pipefd);
             close(out_fd);
             exit(EXIT_FAILURE);
         }
 
-        if (pid[i] == 0) {  // Child process
-            // Set environment variables
-            // Set environment variables
-            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
- 
-            //setenv("PATH", "home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
-            setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
-            setenv("CATFOOD", "yummy", 1);
+        if (pid[i] == 0) { // Child process
+            // Clear unnecessary environment variables
+            unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset in each child
             
+            // Set environment variables according to the child
+            if (i == 0) { // kitty -2
+                setenv("CATFOOD", "yummy", 1);
+            } else if (i == 1) { // kitty -3
+                // No additional environment variables needed
+            } else if (i == 2) { // kitty -4
+                setenv("CATFOOD", "yummy", 1);
+                setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
+                setenv("PATH", getenv("PATH"), 1); // Set PATH to parent's PATH
+            }
 
             // Redirect input
-            if (i == 0) {  // First child reads from the input file
+            if (i == 0) { // First child reads from the input file
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
@@ -72,24 +77,24 @@ int main(int argc, char *argv[]) {
                 }
                 dup2(in_fd, STDIN_FILENO);
                 close(in_fd);  // Close after redirection
-            } else {  // Other children read from the previous pipe
+            } else { // Other children read from the previous pipe
                 dup2(pipefd[i - 1][0], STDIN_FILENO);
             }
 
             // Redirect output
-            if (i < 2) {  // First two children write to the next pipe
+            if (i < 2) { // First two children write to the next pipe
                 dup2(pipefd[i][1], STDOUT_FILENO);
-            } else {  // Last child writes to the output file
+            } else { // Last child writes to the output file
                 dup2(out_fd, STDOUT_FILENO);
             }
 
             // Close all pipes in the child process
             close_all_pipes(pipefd);
-            close(out_fd);  // Ensure output file is closed
+            close(out_fd); // Ensure output file is closed
 
             // Execute the kitty command
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i);
+            snprintf(arg, sizeof(arg), "-%d", i + 2); // Correct command line argument
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
             // If exec fails
@@ -98,9 +103,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Parent process: Close all pipes
+    // Parent process: Close all pipe write ends
     close_all_pipes(pipefd);
-    close(out_fd);  // Close output file in parent
+    close(out_fd); // Close output file in parent
 
     // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
@@ -109,7 +114,7 @@ int main(int argc, char *argv[]) {
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(EXIT_FAILURE);  // Exit if any child fails
+            exit(EXIT_FAILURE); // Exit if any child fails
         }
     }
 
