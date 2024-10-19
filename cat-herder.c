@@ -3,10 +3,18 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"  // Path to the kitty executable
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    const char *input_file = argv[1];
+    const char *output_file = argv[2];
     pid_t pid[3];  // Store PIDs of the three child processes
     int pipefd[2][2];  // Two pipes for three processes
 
@@ -16,6 +24,13 @@ int main() {
             perror("pipe");
             exit(EXIT_FAILURE);
         }
+    }
+
+    // Open the output file
+    int out_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out_fd == -1) {
+        perror("open output file");
+        exit(EXIT_FAILURE);
     }
 
     // Create three child processes
@@ -38,11 +53,29 @@ int main() {
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
+            } else {
+                // Read from the input file for the first child
+                int in_fd = open(input_file, O_RDONLY);
+                if (in_fd == -1) {
+                    perror("open input file");
+                    exit(EXIT_FAILURE);
+                }
+                if (dup2(in_fd, STDIN_FILENO) == -1) {  // Read from input file
+                    perror("dup2");
+                    exit(EXIT_FAILURE);
+                }
+                close(in_fd);  // Close the input file descriptor
             }
 
             // Handle output to the next pipe (if applicable)
             if (i < 2) {
                 if (dup2(pipefd[i][1], STDOUT_FILENO) == -1) {  // Write to next pipe
+                    perror("dup2");
+                    exit(EXIT_FAILURE);
+                }
+            } else {
+                // Write to the output file for the last child
+                if (dup2(out_fd, STDOUT_FILENO) == -1) {  // Write to output file
                     perror("dup2");
                     exit(EXIT_FAILURE);
                 }
@@ -69,6 +102,9 @@ int main() {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][1]);
     }
+
+    // Close the output file descriptor in the parent process
+    close(out_fd);
 
     // Parent process: Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
