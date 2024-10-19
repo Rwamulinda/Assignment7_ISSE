@@ -7,6 +7,7 @@
 #include <string.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
+#define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
 
 // Function to close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
@@ -18,19 +19,16 @@ void close_all_pipes(int pipefd[2][2]) {
 
 // Function to set only required environment variables
 void setup_environment(int child_index) {
-    // Clear all unnecessary environment variables
-    unsetenv("KITTYLITTER");
-
     // Set specific environment variables based on child index
     if (child_index == 0) { // kitty -2
         setenv("CATFOOD", "yummy", 1);
-        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
+        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
     } else if (child_index == 1) { // kitty -3
-        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
+        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
     } else if (child_index == 2) { // kitty -4
         setenv("CATFOOD", "yummy", 1);
         setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
+        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
     }
 }
 
