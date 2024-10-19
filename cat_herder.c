@@ -1,112 +1,113 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>  // For open()
+#include <fcntl.h>
 
-void execute_kitty(char *args[], int input_fd, int output_fd) {
-    pid_t pid = fork();
-    if (pid < 0) {
-        perror("fork failed");
-        exit(1);
-    }
+#define KITTY_EXEC "/var/local/isse-07/kitty"
 
-    if (pid == 0) {  // Child process
-        // Redirect input and output if needed
-        if (input_fd != STDIN_FILENO) {
-            dup2(input_fd, STDIN_FILENO);
-            close(input_fd);
-        }
-        if (output_fd != STDOUT_FILENO) {
-            dup2(output_fd, STDOUT_FILENO);
-            close(output_fd);
-        }
-
-        // Execute the kitty process
-        if (execvp(args[0], args) == -1) {
-            perror("execvp failed");
-            exit(1);
-        }
-    } else {  // Parent process
-        // Close the unused file descriptors in the parent
-        close(input_fd);
-        close(output_fd);
+void close_all_pipes(int pipefd[2][2]) {
+    for (int i = 0; i < 2; i++) {
+        close(pipefd[i][0]);
+        close(pipefd[i][1]);
     }
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s <inputfile> <outputfile>\n", argv[0]);
-        return 1;
+        fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
+        return EXIT_FAILURE;
     }
 
-    char *inputfile = argv[1];
-    char *outputfile = argv[2];
-
-    if (strcmp(inputfile, outputfile) == 0) {
-        fprintf(stderr, "Error: inputfile and outputfile cannot be the same.\n");
-        return 1;
-    }
-
-    // Open input and output files
-    int input_fd = open(inputfile, O_RDONLY);
-    if (input_fd < 0) {
-        perror("Failed to open input file");
-        return 1;
-    }
-
-    int output_fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (output_fd < 0) {
-        perror("Failed to open output file");
-        close(input_fd);
-        return 1;
-    }
-
-    // Define the arguments for each kitty process
-    char *args1[] = {"/var/local/isse-07/kitty", "-2", NULL};
-    char *args2[] = {"/var/local/isse-07/kitty", "-3", NULL};
-    char *args3[] = {"/var/local/isse-07/kitty", "-4", NULL};
+    const char *input_file = argv[1];
+    const char *output_file = argv[2];
+    pid_t pid[3];
+    int pipefd[2][2];
 
     // Create pipes
-    int pipe1[2], pipe2[2];
-    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
-        perror("pipe failed");
-        close(input_fd);
-        close(output_fd);
-        return 1;
+    for (int i = 0; i < 2; i++) {
+        if (pipe(pipefd[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    // Execute kitty -2, redirecting input from the input file and output to pipe1
-    execute_kitty(args1, input_fd, pipe1[1]);
-    // Parent closes the write-end of pipe1
-    close(pipe1[1]); 
+    // Open the output file
+    int out_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out_fd == -1) {
+        perror("open output file");
+        close_all_pipes(pipefd);
+        exit(EXIT_FAILURE);
+    }
 
-    // Execute kitty -3, redirecting input from pipe1 and output to pipe2
-    execute_kitty(args2, pipe1[0], pipe2[1]);
-    // Parent closes the read-end of pipe1 and write-end of pipe2
-    close(pipe1[0]);  
-    close(pipe2[1]);  
+    // Fork three child processes
+    for (int i = 0; i < 3; i++) {
+        pid[i] = fork();
 
-    // Execute kitty -4, redirecting input from pipe2 and output to the output file
-    execute_kitty(args3, pipe2[0], output_fd);
-    // Parent closes the read-end of pipe2 and the output file descriptor
-    close(pipe2[0]);  
-    close(output_fd); 
-
-    // Wait for all children to exit
-    int status;
-    for (int i = 0; i < 3; ++i) {
-        if (wait(&status) == -1) {
-            perror("wait failed");
-            return 1;
+        if (pid[i] < 0) { // Fork error
+            perror("fork");
+            close_all_pipes(pipefd);
+            close(out_fd);
+            exit(EXIT_FAILURE);
         }
+
+        if (pid[i] == 0) { // Child process
+            // Set environment variables
+            setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
+            setenv("CATFOOD", "yummy", 1);
+
+            // Redirect input
+            if (i == 0) {
+                int in_fd = open(input_file, O_RDONLY);
+                if (in_fd == -1) {
+                    perror("open input file");
+                    close_all_pipes(pipefd);
+                    exit(EXIT_FAILURE);
+                }
+                dup2(in_fd, STDIN_FILENO);
+                close(in_fd);
+            } else {
+                dup2(pipefd[i - 1][0], STDIN_FILENO);
+            }
+
+            // Redirect output
+            if (i < 2) {
+                dup2(pipefd[i][1], STDOUT_FILENO);
+            } else {
+                dup2(out_fd, STDOUT_FILENO);
+            }
+
+            // Close all pipes in the child process
+            close_all_pipes(pipefd);
+            close(out_fd);
+
+            // Execute the kitty command
+            char arg[3];
+            snprintf(arg, sizeof(arg), "-%d", i);
+            execl(KITTY_EXEC, "kitty", arg, NULL);
+
+            // If exec fails
+            perror("execl");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Parent process: Close all pipes
+    close_all_pipes(pipefd);
+    close(out_fd);
+
+    // Wait for all child processes to complete
+    for (int i = 0; i < 3; i++) {
+        int status;
+        waitpid(pid[i], &status, 0);
+
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-            fprintf(stderr, "A child process exited with non-zero status\n");
-            return 1;
+            fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
+            exit(EXIT_FAILURE);
         }
     }
 
+    printf("All child processes completed successfully\n");
     return 0;
 }
