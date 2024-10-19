@@ -56,8 +56,9 @@ int main(int argc, char *argv[]) {
             // Set environment variables according to the child
             if (i == 0) { // kitty -2
                 setenv("CATFOOD", "yummy", 1);
+                unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
             } else if (i == 1) { // kitty -3
-                unsetenv("KITTYLITTER");
+                unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
             } else if (i == 2) { // kitty -4
                 setenv("CATFOOD", "yummy", 1);
                 setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
 
             // Execute the kitty command
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i);
+            snprintf(arg, sizeof(arg), "-%d", i + 2); // Correct command line argument
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
             // If exec fails
