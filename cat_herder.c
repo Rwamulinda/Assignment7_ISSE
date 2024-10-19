@@ -22,15 +22,16 @@ void setup_environment(int child_index) {
     // Clear unnecessary environment variables
     unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
 
-     // Combine the current PATH with the required PATH
+    // Combine the current PATH with the required PATH and add /home/puwase
     char combined_path[1024]; // Buffer to hold the combined PATH
     const char *current_path = getenv("PATH");
+    const char *home_path = "/home/puwase"; // Required home path
 
     // Build the combined PATH
     if (current_path) {
-        snprintf(combined_path, sizeof(combined_path), "%s:%s", current_path, EXPECTED_PATH);
+        snprintf(combined_path, sizeof(combined_path), "%s:%s:%s", current_path, EXPECTED_PATH, home_path);
     } else {
-        snprintf(combined_path, sizeof(combined_path), "%s", EXPECTED_PATH);
+        snprintf(combined_path, sizeof(combined_path), "%s:%s", EXPECTED_PATH, home_path);
     }
 
     // Set environment variables based on child index
@@ -41,18 +42,11 @@ void setup_environment(int child_index) {
         setenv("PATH", combined_path, 1);
     } else if (child_index == 2) { // Third child
         setenv("CATFOOD", "yummy", 1);
-        setenv("HOME", getenv("HOME"), 1);
+        setenv("HOME", home_path, 1); // Set HOME to the required home directory
         setenv("PATH", combined_path, 1);
     }
+}
 
-    // Set specific environment variables based on child index
-    //if (child_index == 0) { // kitty -2
-        //setenv("CATFOOD", "yummy", 1);
-    //} else if (child_index == 2) { // kitty -4
-        //setenv("CATFOOD", "yummy", 1);
-        //setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-        //setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
-    }
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
