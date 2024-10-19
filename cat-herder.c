@@ -17,26 +17,27 @@ void close_all_pipes(int pipefd[2][2]) {
 }
 
 void setup_environment(int child_index) {
+    // Combine the current PATH with the required PATH
     char combined_path[1024]; // Buffer to hold the combined PATH
     const char *current_path = getenv("PATH");
 
     // Build the combined PATH
     if (current_path) {
-        snprintf(combined_path, sizeof(combined_path), "%s:/home/puwase:%s", current_path, EXPECTED_PATH);
+        snprintf(combined_path, sizeof(combined_path), "%s:%s", current_path, EXPECTED_PATH);
     } else {
-        snprintf(combined_path, sizeof(combined_path), "/home/puwase:%s", EXPECTED_PATH);
+        snprintf(combined_path, sizeof(combined_path), "%s", EXPECTED_PATH);
     }
 
     // Set environment variables based on child index
-    if (child_index == 0) { // kitty -2
+    if (child_index == 0) { // First child
         setenv("CATFOOD", "yummy", 1);
-        setenv("PATH", combined_path, 1); // Set combined PATH
-    } else if (child_index == 1) { // kitty -3
-        setenv("PATH", combined_path, 1); // Set combined PATH
-    } else if (child_index == 2) { // kitty -4
+        setenv("PATH", combined_path, 1);
+    } else if (child_index == 1) { // Second child
+        setenv("PATH", combined_path, 1);
+    } else if (child_index == 2) { // Third child
         setenv("CATFOOD", "yummy", 1);
-        setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-        setenv("PATH", combined_path, 1); // Set combined PATH
+        setenv("HOME", getenv("HOME"), 1);
+        setenv("PATH", combined_path, 1);
     }
 }
 
