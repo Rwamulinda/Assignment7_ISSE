@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
 
         if (pid[i] == 0) {  // Child process
             // Set environment variables
-            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
+            setenv("PATH", "home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
             //setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
             setenv("CATFOOD", "yummy", 1);
             
