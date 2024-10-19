@@ -1,111 +1,48 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-#include <string.h>
-#include <errno.h>
 
-#define NUM_PROCESSES 3 // We need 3 child processes
-#define KITTY_EXEC "./kitty"
+// Define the full path to the kitty executable
+#define KITTY_EXEC "/var/local/isse-07/kitty"
 
-// Utility function for error handling
-void error_exit(const char *msg) {
-    perror(msg);
-    exit(EXIT_FAILURE);
-}
+int main() {
+    pid_t pid[3];  // Store PIDs of the three child processes
 
-// Function to close a file descriptor and handle errors
-void safe_close(int fd) {
-    if (close(fd) == -1) {
-        error_exit("close");
-    }
-}
+    // Create three child processes
+    for (int i = 0; i < 3; i++) {
+        pid[i] = fork();
 
-// Wrapper to fork and handle errors
-pid_t safe_fork() {
-    pid_t pid = fork();
-    if (pid < 0) {
-        error_exit("fork");
-    }
-    return pid;
-}
-
-int main(int argc, char *argv[]) {
-    int pipe1[2], pipe2[2];  // Two pipes to link the three processes
-    pid_t pids[NUM_PROCESSES];  // To store child PIDs
-    int status;
-
-    // Create the first pipe
-    if (pipe(pipe1) == -1) {
-        error_exit("pipe1");
-    }
-
-    // Create the second pipe
-    if (pipe(pipe2) == -1) {
-        error_exit("pipe2");
-    }
-
-    // Start the first child process: kitty -0
-    pids[0] = safe_fork();
-    if (pids[0] == 0) {
-        // Child 1: Redirect stdout to pipe1's write end
-        safe_close(pipe1[0]);  // Close unused read end
-        dup2(pipe1[1], STDOUT_FILENO);  // Redirect stdout to pipe1
-        safe_close(pipe1[1]);
-
-        // Execute kitty -0
-        execlp(KITTY_EXEC, KITTY_EXEC, "-0", NULL);
-        error_exit("execlp kitty -0");  // If exec fails
-    }
-
-    // Start the second child process: kitty -1
-    pids[1] = safe_fork();
-    if (pids[1] == 0) {
-        // Child 2: Redirect stdin from pipe1's read end, stdout to pipe2's write end
-        safe_close(pipe1[1]);  // Close unused write end
-        dup2(pipe1[0], STDIN_FILENO);  // Redirect stdin to pipe1
-        safe_close(pipe1[0]);
-
-        safe_close(pipe2[0]);  // Close unused read end of pipe2
-        dup2(pipe2[1], STDOUT_FILENO);  // Redirect stdout to pipe2
-        safe_close(pipe2[1]);
-
-        // Execute kitty -1
-        execlp(KITTY_EXEC, KITTY_EXEC, "-1", NULL);
-        error_exit("execlp kitty -1");  // If exec fails
-    }
-
-    // Start the third child process: kitty -2
-    pids[2] = safe_fork();
-    if (pids[2] == 0) {
-        // Child 3: Redirect stdin from pipe2's read end
-        safe_close(pipe2[1]);  // Close unused write end
-        dup2(pipe2[0], STDIN_FILENO);  // Redirect stdin to pipe2
-        safe_close(pipe2[0]);
-
-        // Execute kitty -2
-        execlp(KITTY_EXEC, KITTY_EXEC, "-2", NULL);
-        error_exit("execlp kitty -2");  // If exec fails
-    }
-
-    // Parent process: Close all unused pipe ends
-    safe_close(pipe1[0]);
-    safe_close(pipe1[1]);
-    safe_close(pipe2[0]);
-    safe_close(pipe2[1]);
-
-    // Wait for all child processes to finish
-    int success = 1;
-    for (int i = 0; i < NUM_PROCESSES; i++) {
-        if (waitpid(pids[i], &status, 0) == -1) {
-            error_exit("waitpid");
+        if (pid[i] < 0) {
+            perror("fork");
+            exit(1);
         }
+
+        if (pid[i] == 0) {  // Child process
+            // Use execl to run /var/local/isse-07/kitty with an argument indicating the child number
+            char arg[3];
+            snprintf(arg, sizeof(arg), "-%d", i);  // Format "-0", "-1", "-2"
+
+            execl(KITTY_EXEC, "kitty", arg, NULL);
+
+            // If execl fails, print an error and exit
+            perror("execl");
+            exit(1);
+        }
+    }
+
+    // Parent process: Wait for all child processes to complete
+    for (int i = 0; i < 3; i++) {
+        int status;
+        waitpid(pid[i], &status, 0);  // Wait for each child to complete
+
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-            success = 0;  // If any child exits with non-zero, set failure
+            fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
+            exit(1);  // Exit if any child failed
         }
     }
 
-    // Exit with 0 if all processes succeed, otherwise 1
-    return success ? EXIT_SUCCESS : EXIT_FAILURE;
+    printf("All child processes completed successfully\n");
+    return 0;
 }
