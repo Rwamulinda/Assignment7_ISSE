@@ -4,12 +4,10 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <string.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 #define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
 
-// Function to close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][0]);
@@ -17,18 +15,29 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
-// Function to set only required environment variables
 void setup_environment(int child_index) {
-    // Set specific environment variables based on child index
+    char combined_path[1024]; // Buffer to hold the combined PATH
+
+    // Get the existing PATH
+    const char *current_path = getenv("PATH");
+
+    // Build the combined PATH
+    if (current_path) {
+        snprintf(combined_path, sizeof(combined_path), "%s:/home/puwase:%s", current_path, EXPECTED_PATH);
+    } else {
+        snprintf(combined_path, sizeof(combined_path), "/home/puwase:%s", EXPECTED_PATH);
+    }
+
+    // Set environment variables based on child index
     if (child_index == 0) { // kitty -2
         setenv("CATFOOD", "yummy", 1);
-        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
+        setenv("PATH", combined_path, 1); // Set combined PATH
     } else if (child_index == 1) { // kitty -3
-        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
+        setenv("PATH", combined_path, 1); // Set combined PATH
     } else if (child_index == 2) { // kitty -4
         setenv("CATFOOD", "yummy", 1);
         setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
+        setenv("PATH", combined_path, 1); // Set combined PATH
     }
 }
 
@@ -71,7 +80,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid[i] == 0) { // Child process
-            setup_environment(i); // Set up environment variables
+            setup_environment(i); // Set environment variables
 
             // Redirect input
             if (i == 0) { // First child reads from the input file
@@ -100,7 +109,7 @@ int main(int argc, char *argv[]) {
 
             // Execute the kitty command
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i + 2); // Adjust command line argument
+            snprintf(arg, sizeof(arg), "-%d", i);
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
             // If exec fails
