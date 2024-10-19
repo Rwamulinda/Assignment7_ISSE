@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 #define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
@@ -17,8 +18,6 @@ void close_all_pipes(int pipefd[2][2]) {
 
 void setup_environment(int child_index) {
     char combined_path[1024]; // Buffer to hold the combined PATH
-
-    // Get the existing PATH
     const char *current_path = getenv("PATH");
 
     // Build the combined PATH
