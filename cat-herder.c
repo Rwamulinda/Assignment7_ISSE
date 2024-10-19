@@ -4,13 +4,30 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
+// Function to close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][0]);
         close(pipefd[i][1]);
+    }
+}
+
+// Function to set only required environment variables
+void setup_environment(int child_index) {
+    // Clear unnecessary environment variables
+    unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
+
+    // Set specific environment variables based on child index
+    if (child_index == 0) { // kitty -2
+        setenv("CATFOOD", "yummy", 1);
+    } else if (child_index == 2) { // kitty -4
+        setenv("CATFOOD", "yummy", 1);
+        setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
+        setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1); // Adjust PATH
     }
 }
 
@@ -53,19 +70,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid[i] == 0) { // Child process
-            // Clear unnecessary environment variables
-            unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset in each child
-            
-            // Set environment variables according to the child
-            if (i == 0) { // kitty -2
-                setenv("CATFOOD", "yummy", 1);
-            } else if (i == 1) { // kitty -3
-                // No additional environment variables needed
-            } else if (i == 2) { // kitty -4
-                setenv("CATFOOD", "yummy", 1);
-                setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-                setenv("PATH", getenv("PATH"), 1); // Set PATH to parent's PATH
-            }
+            setup_environment(i); // Set up environment variables
 
             // Redirect input
             if (i == 0) { // First child reads from the input file
