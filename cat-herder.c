@@ -22,7 +22,7 @@ void setup_environment(int child_index) {
     // Set specific environment variables based on child index
     if (child_index == 0) { // kitty -2
         setenv("CATFOOD", "yummy", 1);
-        setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
+        setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1); // Set PATH explicitly
     } else if (child_index == 1) { // kitty -3
         setenv("PATH", EXPECTED_PATH, 1); // Set PATH explicitly
     } else if (child_index == 2) { // kitty -4
