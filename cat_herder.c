@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <stdio.h> 
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -22,28 +22,18 @@ void setup_environment(int child_index) {
     // Clear unnecessary environment variables
     unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
 
-    // Combine the current PATH with the required PATH and add /home/puwase
-    char combined_path[1024]; // Buffer to hold the combined PATH
-    const char *current_path = getenv("PATH");
-    const char *home_path = "/home/puwase"; // Required home path
-
-    // Build the combined PATH
-    if (current_path) {
-        snprintf(combined_path, sizeof(combined_path), "%s:%s:%s", current_path, EXPECTED_PATH, home_path);
-    } else {
-        snprintf(combined_path, sizeof(combined_path), "%s:%s", EXPECTED_PATH, home_path);
-    }
-
-    // Set environment variables based on child index
+    // Set specific environment variables based on child index
     if (child_index == 0) { // First child
         setenv("CATFOOD", "yummy", 1);
-        setenv("PATH", combined_path, 1);
+        setenv("HOME", "/nonexistent", 1); // Set HOME to expected value
+        setenv("PATH", EXPECTED_PATH, 1);
     } else if (child_index == 1) { // Second child
-        setenv("PATH", combined_path, 1);
+        setenv("HOME", "/nonexistent", 1); // Set HOME to expected value
+        setenv("PATH", EXPECTED_PATH, 1);
     } else if (child_index == 2) { // Third child
         setenv("CATFOOD", "yummy", 1);
-        setenv("HOME", home_path, 1); // Set HOME to the required home directory
-        setenv("PATH", combined_path, 1);
+        setenv("HOME", "/nonexistent", 1); // Set HOME to expected value
+        setenv("PATH", EXPECTED_PATH, 1);
     }
 }
 
