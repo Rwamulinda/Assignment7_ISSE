@@ -53,12 +53,12 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid[i] == 0) { // Child process
-            // Set environment variables
-            setenv("PATH", "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin", 1);
+            // Set environment variables to the expected values
+            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07", 1);
             setenv("CATFOOD", "yummy", 1);
 
             // Redirect input
-            if (i == 0) {
+            if (i == 0) { // First child reads from the input file
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
@@ -66,21 +66,21 @@ int main(int argc, char *argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 dup2(in_fd, STDIN_FILENO);
-                close(in_fd);
-            } else {
+                close(in_fd);  // Close after redirection
+            } else { // Other children read from the previous pipe
                 dup2(pipefd[i - 1][0], STDIN_FILENO);
             }
 
             // Redirect output
-            if (i < 2) {
+            if (i < 2) { // First two children write to the next pipe
                 dup2(pipefd[i][1], STDOUT_FILENO);
-            } else {
+            } else { // Last child writes to the output file
                 dup2(out_fd, STDOUT_FILENO);
             }
 
             // Close all pipes in the child process
             close_all_pipes(pipefd);
-            close(out_fd);
+            close(out_fd); // Ensure output file is closed
 
             // Execute the kitty command
             char arg[3];
@@ -93,9 +93,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Parent process: Close all pipes
+    // Parent process: Close all pipe write ends
     close_all_pipes(pipefd);
-    close(out_fd);
+    close(out_fd); // Close output file in parent
 
     // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE); // Exit if any child fails
         }
     }
 
