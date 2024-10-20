@@ -4,95 +4,81 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
-#include <string.h>
 
-#define KITTY_EXEC "/var/local/isse-07/kitty"
-#define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
-#define HOME_DIR "/home/puwase"
-
-// Function to close all pipe file descriptors
-void close_all_pipes(int pipefd[2][2]) {
-    for (int i = 0; i < 2; i++) {
-        close(pipefd[i][0]);
-        close(pipefd[i][1]);
-    }
-}
-
-// Function to set the required environment variables for each child process
-void setup_environment(int child_index) {
-    clearenv();  // Clear all existing environment variables
-
-    setenv("HOME", HOME_DIR, 1);  // Set HOME to the expected directory
-    setenv("PATH", EXPECTED_PATH, 1);  // Set PATH to the expected path
-
-    // Set environment variables based on the child index (runlevel)
-    if (child_index == 2) {
-        setenv("CATFOOD", "yummy", 1);  // Set CATFOOD to 'yummy'
-    } else if (child_index == 3) {
-        unsetenv("KITTYLITTER");  // Ensure KITTYLITTER is not set
-    }
-}
-
-// Function to handle the creation of a single child process
-void create_child(int pipefd[2][2], int index) {
+// Function to create child processes and run "kitty" with appropriate arguments
+void create_child(int index, int input_fd, int output_fd) {
     pid_t pid = fork();
-
     if (pid < 0) {
-        perror("fork");
+        perror("Fork failed");
         exit(1);
-    }
-
-    if (pid == 0) {  // Child process
-        if (index == 0) {
-            dup2(pipefd[0][1], STDOUT_FILENO);  // Redirect stdout to the first pipe's write end
-        } else if (index == 1) {
-            dup2(pipefd[0][0], STDIN_FILENO);   // Read from the first pipe's read end
-            dup2(pipefd[1][1], STDOUT_FILENO);  // Write to the second pipe's write end
-        } else if (index == 2) {
-            dup2(pipefd[1][0], STDIN_FILENO);   // Read from the second pipe's read end
+    } else if (pid == 0) { // Child process
+        if (dup2(input_fd, STDIN_FILENO) == -1) {
+            perror("dup2 input_fd failed");
+            exit(1);
+        }
+        if (dup2(output_fd, STDOUT_FILENO) == -1) {
+            perror("dup2 output_fd failed");
+            exit(1);
         }
 
-        close_all_pipes(pipefd);  // Close all pipe file descriptors in child
+        // Close unused file descriptors
+        close(input_fd);
+        close(output_fd);
 
-        // Set up the environment and execute the kitty program with appropriate runlevel
-        setup_environment(index + 2);
-        char arg[3];
+        // Create argument string safely
+        char arg[16];  // Increased buffer size to prevent truncation
         snprintf(arg, sizeof(arg), "-%d", index + 2);  // Generate argument (e.g., "-2", "-3", "-4")
-        execl(KITTY_EXEC, "kitty", arg, NULL);  // Execute kitty with the appropriate runlevel
 
-        perror("execl");  // If execl fails
+        // Execute "kitty" with the generated argument
+        execlp("kitty", "kitty", arg, (char *)NULL);
+
+        // If execlp fails
+        perror("execlp failed");
         exit(1);
     }
 }
 
-// Main function
-int main() {
-    int pipefd[2][2];  // Create two pipes
-
-    // Create the pipes
-    if (pipe(pipefd[0]) == -1 || pipe(pipefd[1]) == -1) {
-        perror("pipe");
+int main(int argc, char *argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <inputfile> <outputfile>\n", argv[0]);
         exit(1);
     }
 
-    // Create the three child processes
-    for (int i = 0; i < 3; i++) {
-        create_child(pipefd, i);
+    // Open input and output files
+    int input_fd = open(argv[1], O_RDONLY);
+    if (input_fd < 0) {
+        perror("Error opening input file");
+        exit(1);
     }
 
-    // Close all pipe file descriptors in the parent process
-    close_all_pipes(pipefd);
+    int output_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        perror("Error opening output file");
+        close(input_fd);
+        exit(1);
+    }
 
-    // Wait for all child processes to finish
+    // Create three child processes for the pipeline
+    create_child(0, input_fd, STDOUT_FILENO);  // First child, input from input file
+    create_child(1, STDIN_FILENO, STDOUT_FILENO);  // Second child, intermediate
+    create_child(2, STDIN_FILENO, output_fd);  // Third child, output to output file
+
+    // Close input and output file descriptors in the parent process
+    close(input_fd);
+    close(output_fd);
+
+    // Wait for all child processes to complete
     int status;
-    for (int i = 0; i < 3; i++) {
-        wait(&status);
-        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-            fprintf(stderr, "Child process %d failed with exit status %d\n", i, WEXITSTATUS(status));
-            exit(1);  // Exit with status 1 if any child fails
+    for (int i = 0; i < 3; ++i) {
+        if (wait(&status) == -1) {
+            perror("wait failed");
+            exit(1);
+        }
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            fprintf(stderr, "Child process %d failed\n", i);
+            exit(1);
         }
     }
 
-    printf("All child processes completed successfully.\n");
     return 0;
 }
