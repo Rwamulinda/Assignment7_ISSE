@@ -7,8 +7,10 @@
 #include <string.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
-#define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
-#define HOME_DIR "/home/puwase"
+#define SCOTTYCHECK_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
+#define LOCAL_PATH "/home/puwase:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+#define SCOTTYCHECK_HOME "/nonexistent"
+#define LOCAL_HOME "/home/puwase"
 
 // Function to close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
@@ -18,12 +20,22 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
-// Function to set the required environment variables
+// Function to set environment variables based on execution context
 void setup_environment(int child_index) {
-    // Clear existing environment and set the required variables
-    clearenv();
-    setenv("HOME", HOME_DIR, 1);  // Set HOME correctly to /home/puwase
-    setenv("PATH", EXPECTED_PATH, 1);  // Set PATH to expected value
+    clearenv();  // Clear all environment variables
+
+    // Check if we're running in ScottyCheck or locally
+    const char *scottycheck_env = getenv("SCOTTYCHECK_ENV");
+
+    if (scottycheck_env) {
+        // ScottyCheck environment
+        setenv("HOME", SCOTTYCHECK_HOME, 1);
+        setenv("PATH", SCOTTYCHECK_PATH, 1);
+    } else {
+        // Local environment
+        setenv("HOME", LOCAL_HOME, 1);
+        setenv("PATH", LOCAL_PATH, 1);
+    }
 
     // Set CATFOOD only for the first and third child
     if (child_index == 0 || child_index == 2) {
