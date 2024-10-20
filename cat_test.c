@@ -3,89 +3,93 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <errno.h>
 
-void error_exit(const char *msg) {
-    perror(msg);
-    exit(1);
-}
+// Path to kitty
+#define KITTY_PATH "/var/local/isse-07/kitty"
 
-void setup_pipe(int pipefd[2]) {
-    if (pipe(pipefd) == -1) {
-        error_exit("pipe");
+// Function to close all unnecessary file descriptors
+void close_extra_fds() {
+    for (int fd = 3; fd < 1024; fd++) {
+        close(fd);
     }
 }
 
-void child_process(const char *arg, char **envp, int input_fd, int output_fd) {
-    // Redirect input and output
-    if (dup2(input_fd, STDIN_FILENO) == -1) error_exit("dup2 input");
-    if (dup2(output_fd, STDOUT_FILENO) == -1) error_exit("dup2 output");
-
-    // Close unused file descriptors
-    close(input_fd);
-    close(output_fd);
-
-    // Execute the kitty process
-    execlp("kitty", "kitty", arg, NULL);
-    error_exit("exec");
-}
-
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: cat-herder inputfile outputfile\n");
+        fprintf(stderr, "Usage: %s inputfile outputfile\n", argv[0]);
         return 1;
     }
 
-    const char *inputfile = argv[1];
-    const char *outputfile = argv[2];
-
-    // Ensure inputfile and outputfile are not the same
-    if (strcmp(inputfile, outputfile) == 0) {
-        fprintf(stderr, "Error: inputfile and outputfile cannot be the same.\n");
+    // Ensure input and output files are not the same
+    if (strcmp(argv[1], argv[2]) == 0) {
+        fprintf(stderr, "Input and output files must be different.\n");
         return 1;
     }
 
     // Open input and output files
-    int input_fd = open(inputfile, O_RDONLY);
-    if (input_fd == -1) error_exit("open inputfile");
+    int input_fd = open(argv[1], O_RDONLY);
+    if (input_fd < 0) {
+        perror("Error opening input file");
+        return 1;
+    }
 
-    int output_fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (output_fd == -1) error_exit("open outputfile");
+    int output_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (output_fd < 0) {
+        perror("Error opening output file");
+        close(input_fd);
+        return 1;
+    }
 
-    // Set up pipes for inter-process communication
+    // Create pipes
     int pipe1[2], pipe2[2];
-    setup_pipe(pipe1);
-    setup_pipe(pipe2);
+    pipe(pipe1);
+    pipe(pipe2);
 
     pid_t pid1 = fork();
-    if (pid1 == 0) {  // First child: kitty -2
-        close(pipe1[0]);  // Close read end of pipe1
-        char *new_env[] = { "CATFOOD=yummy", NULL };
-        child_process("-2", new_env, input_fd, pipe1[1]);
+    if (pid1 == 0) {  // Child 1
+        close(pipe1[0]);  // Close unused read end
+        dup2(input_fd, STDIN_FILENO);  // Redirect input
+        dup2(pipe1[1], STDOUT_FILENO);  // Redirect output to pipe
+        close(input_fd);
+        close(pipe1[1]);
+
+        close_extra_fds();  // Close all extra file descriptors
+        execl(KITTY_PATH, "kitty", NULL);
+        perror("exec failed");
+        exit(1);
     }
 
     pid_t pid2 = fork();
-    if (pid2 == 0) {  // Second child: kitty -3
+    if (pid2 == 0) {  // Child 2
         close(pipe1[1]);  // Close write end of pipe1
         close(pipe2[0]);  // Close read end of pipe2
-        unsetenv("KITTYLITTER");
-        child_process("-3", envp, pipe1[0], pipe2[1]);
+        dup2(pipe1[0], STDIN_FILENO);  // Read from pipe1
+        dup2(pipe2[1], STDOUT_FILENO);  // Write to pipe2
+        close(pipe1[0]);
+        close(pipe2[1]);
+
+        setenv("CATFOOD", "yummy", 1);  // Set required environment variable
+        close_extra_fds();  // Close all extra file descriptors
+        execl(KITTY_PATH, "kitty", NULL);
+        perror("exec failed");
+        exit(1);
     }
 
     pid_t pid3 = fork();
-    if (pid3 == 0) {  // Third child: kitty -4
+    if (pid3 == 0) {  // Child 3
         close(pipe2[1]);  // Close write end of pipe2
-        char *new_env[] = {
-            "PATH=/usr/bin",
-            "HOME=/home/user",
-            "CATFOOD=yummy",
-            NULL
-        };
-        child_process("-4", new_env, pipe2[0], output_fd);
+        dup2(pipe2[0], STDIN_FILENO);  // Read from pipe2
+        dup2(output_fd, STDOUT_FILENO);  // Write to output file
+        close(pipe2[0]);
+        close(output_fd);
+
+        close_extra_fds();  // Close all extra file descriptors
+        execl(KITTY_PATH, "kitty", NULL);
+        perror("exec failed");
+        exit(1);
     }
 
-    // Parent process closes all file descriptors
+    // Close all file descriptors in the parent process
     close(input_fd);
     close(output_fd);
     close(pipe1[0]);
@@ -93,15 +97,14 @@ int main(int argc, char *argv[], char *envp[]) {
     close(pipe2[0]);
     close(pipe2[1]);
 
-    // Wait for all children to exit
-    int status1, status2, status3;
-    waitpid(pid1, &status1, 0);
-    waitpid(pid2, &status2, 0);
-    waitpid(pid3, &status3, 0);
+    // Wait for all child processes
+    int status;
+    waitpid(pid1, &status, 0);
+    waitpid(pid2, &status, 0);
+    waitpid(pid3, &status, 0);
 
-    // Check exit statuses
-    if (WIFEXITED(status1) && WIFEXITED(status2) && WIFEXITED(status3) &&
-        WEXITSTATUS(status1) == 0 && WEXITSTATUS(status2) == 0 && WEXITSTATUS(status3) == 0) {
+    // Check exit status
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
         return 0;
     } else {
         return 1;
