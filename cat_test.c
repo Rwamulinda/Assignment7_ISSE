@@ -8,7 +8,7 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 #define EXPECTED_PATH "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/var/local/scottycheck/isse-07"
-#define HOME_DIR "/home/puwase"  // Set HOME to the expected directory
+#define HOME_DIR "/home/puwase"
 
 // Function to close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
@@ -20,9 +20,10 @@ void close_all_pipes(int pipefd[2][2]) {
 
 // Function to set the required environment variables
 void setup_environment(int child_index) {
-    clearenv();  // Clear all existing environment variables
-    setenv("HOME","/nonexistent", 1);  // Set HOME to /home/puwase
-    setenv("PATH", EXPECTED_PATH, 1);  // Set PATH to the expected path
+    // Clear existing environment and set the required variables
+    clearenv();
+    setenv("HOME", HOME_DIR, 1);  // Set HOME correctly to /home/puwase
+    setenv("PATH", EXPECTED_PATH, 1);  // Set PATH to expected value
 
     // Set CATFOOD only for the first and third child
     if (child_index == 0 || child_index == 2) {
