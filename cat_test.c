@@ -5,7 +5,6 @@
 #include <string.h>
 #include <sys/wait.h>
 
-
 // Path to kitty
 #define KITTY_PATH "/var/local/isse-07/kitty"
 
@@ -55,8 +54,8 @@ int main(int argc, char *argv[]) {
         close(input_fd);
         close(pipe1[1]);
 
-        close_extra_fds();  // Close all extra file descriptors
-        execl(KITTY_PATH, "kitty", NULL);
+        close_extra_fds();  // Close extra file descriptors
+        execl(KITTY_PATH, "kitty", "-0", NULL);  // Use mode 0 for no checks
         perror("exec failed");
         exit(1);
     }
@@ -71,8 +70,8 @@ int main(int argc, char *argv[]) {
         close(pipe2[1]);
 
         setenv("CATFOOD", "yummy", 1);  // Set required environment variable
-        close_extra_fds();  // Close all extra file descriptors
-        execl(KITTY_PATH, "kitty", NULL);
+        close_extra_fds();  // Close extra file descriptors
+        execl(KITTY_PATH, "kitty", "-2", NULL);  // Use mode 2 for CATFOOD check
         perror("exec failed");
         exit(1);
     }
@@ -85,8 +84,8 @@ int main(int argc, char *argv[]) {
         close(pipe2[0]);
         close(output_fd);
 
-        close_extra_fds();  // Close all extra file descriptors
-        execl(KITTY_PATH, "kitty", NULL);
+        close_extra_fds();  // Close extra file descriptors
+        execl(KITTY_PATH, "kitty", "-4", NULL);  // Use mode 4 for strict environment checks
         perror("exec failed");
         exit(1);
     }
@@ -100,13 +99,15 @@ int main(int argc, char *argv[]) {
     close(pipe2[1]);
 
     // Wait for all child processes
-    int status;
-    waitpid(pid1, &status, 0);
-    waitpid(pid2, &status, 0);
-    waitpid(pid3, &status, 0);
+    int status1, status2, status3;
+    waitpid(pid1, &status1, 0);
+    waitpid(pid2, &status2, 0);
+    waitpid(pid3, &status3, 0);
 
-    // Check exit status
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+    // Check if all child processes exited successfully
+    if (WIFEXITED(status1) && WEXITSTATUS(status1) == 0 &&
+        WIFEXITED(status2) && WEXITSTATUS(status2) == 0 &&
+        WIFEXITED(status3) && WEXITSTATUS(status3) == 0) {
         return 0;
     } else {
         return 1;
