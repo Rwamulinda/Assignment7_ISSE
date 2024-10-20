@@ -3,6 +3,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/wait.h>
+
 
 // Path to kitty
 #define KITTY_PATH "/var/local/isse-07/kitty"
