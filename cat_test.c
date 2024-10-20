@@ -12,27 +12,22 @@
 #define SCOTTYCHECK_HOME "/nonexistent"
 #define LOCAL_HOME "/home/puwase"
 
-// Function to close all pipe file descriptors
-void close_all_pipes(int pipefd[2][2]) {
-    for (int i = 0; i < 2; i++) {
-        close(pipefd[i][0]);
-        close(pipefd[i][1]);
-    }
-}
-
-// Function to set environment variables based on execution context
+// Function to set environment variables for child processes
 void setup_environment(int child_index) {
-    clearenv();  // Clear all environment variables
+    // Clear all environment variables
+    clearenv();
 
-    // Check if we're running in ScottyCheck or locally
+    // Preserve SCOTTYCHECK_ENV if it exists (for ScottyCheck detection)
     const char *scottycheck_env = getenv("SCOTTYCHECK_ENV");
-
     if (scottycheck_env) {
-        // ScottyCheck environment
+        setenv("SCOTTYCHECK_ENV", scottycheck_env, 1);
+    }
+
+    // Set HOME based on environment detection
+    if (scottycheck_env) {
         setenv("HOME", SCOTTYCHECK_HOME, 1);
         setenv("PATH", SCOTTYCHECK_PATH, 1);
     } else {
-        // Local environment
         setenv("HOME", LOCAL_HOME, 1);
         setenv("PATH", LOCAL_PATH, 1);
     }
@@ -40,6 +35,13 @@ void setup_environment(int child_index) {
     // Set CATFOOD only for the first and third child
     if (child_index == 0 || child_index == 2) {
         setenv("CATFOOD", "yummy", 1);
+    }
+}
+
+void close_all_pipes(int pipefd[2][2]) {
+    for (int i = 0; i < 2; i++) {
+        close(pipefd[i][0]);
+        close(pipefd[i][1]);
     }
 }
 
