@@ -21,7 +21,7 @@ void close_all_pipes(int pipefd[2][2]) {
 // Function to set the required environment variables
 void setup_environment(int child_index) {
     clearenv();  // Clear all existing environment variables
-    setenv("HOME", HOME_DIR, 1);  // Set HOME to /home/puwase
+    setenv("HOME","/nonexistent", 1);  // Set HOME to /home/puwase
     setenv("PATH", EXPECTED_PATH, 1);  // Set PATH to the expected path
 
     // Set CATFOOD only for the first and third child
