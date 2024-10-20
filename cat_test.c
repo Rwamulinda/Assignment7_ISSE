@@ -5,22 +5,21 @@
 #include <string.h>
 #include <sys/wait.h>
 
-// Path to kitty executable
 #define KITTY_PATH "/var/local/isse-07/kitty"
 
-// Function to close unnecessary file descriptors
 void close_extra_fds() {
     for (int fd = 3; fd < 1024; fd++) {
         close(fd);
     }
 }
 
-// Set up a minimal environment with required variables
 char *minimal_env[] = {
-    "PATH=/home/puwase",  // Ensure PATH contains the required string
-    "HOME=/home/puwase",  // Required HOME variable
-    "CATFOOD=yummy",       // CATFOOD variable needed for kitty -2
-    NULL                   // Null terminator for environment array
+    "PATH=/home/puwase",
+    "HOME=/home/puwase",
+    "CATFOOD=yummy",
+    "SHELL=/bin/bash",  // Add common environment variables
+    "USER=puwase",
+    NULL
 };
 
 int main(int argc, char *argv[]) {
@@ -29,13 +28,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Ensure input and output files are not the same
     if (strcmp(argv[1], argv[2]) == 0) {
         fprintf(stderr, "Input and output files must be different.\n");
         return 1;
     }
 
-    // Open input and output files
     int input_fd = open(argv[1], O_RDONLY);
     if (input_fd < 0) {
         perror("Error opening input file");
@@ -49,56 +46,53 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Create pipes
     int pipe1[2], pipe2[2];
     pipe(pipe1);
     pipe(pipe2);
 
     pid_t pid1 = fork();
-    if (pid1 == 0) {  // Child 1
-        close(pipe1[0]);  // Close read end of pipe1
-        dup2(input_fd, STDIN_FILENO);  // Redirect input
-        dup2(pipe1[1], STDOUT_FILENO);  // Redirect output to pipe1
+    if (pid1 == 0) {
+        close(pipe1[0]);
+        dup2(input_fd, STDIN_FILENO);
+        dup2(pipe1[1], STDOUT_FILENO);
         close(input_fd);
         close(pipe1[1]);
 
-        close_extra_fds();  // Close extra file descriptors
-        execle(KITTY_PATH, "kitty", "-0", NULL, minimal_env);  // Use mode 0
+        close_extra_fds();
+        execle(KITTY_PATH, "kitty", "-0", NULL, minimal_env);
         perror("exec failed");
         exit(1);
     }
 
     pid_t pid2 = fork();
-    if (pid2 == 0) {  // Child 2
-        close(pipe1[1]);  // Close write end of pipe1
-        close(pipe2[0]);  // Close read end of pipe2
-        dup2(pipe1[0], STDIN_FILENO);  // Read from pipe1
-        dup2(pipe2[1], STDOUT_FILENO);  // Write to pipe2
+    if (pid2 == 0) {
+        close(pipe1[1]);
+        close(pipe2[0]);
+        dup2(pipe1[0], STDIN_FILENO);
+        dup2(pipe2[1], STDOUT_FILENO);
         close(pipe1[0]);
         close(pipe2[1]);
 
-        setenv("CATFOOD", "yummy", 1);  // Set CATFOOD environment variable
-        close_extra_fds();  // Close extra file descriptors
-        execle(KITTY_PATH, "kitty", "-2", NULL, minimal_env);  // Use mode 2
+        close_extra_fds();
+        execle(KITTY_PATH, "kitty", "-3", NULL, minimal_env);  // Use -3 here
         perror("exec failed");
         exit(1);
     }
 
     pid_t pid3 = fork();
-    if (pid3 == 0) {  // Child 3
-        close(pipe2[1]);  // Close write end of pipe2
-        dup2(pipe2[0], STDIN_FILENO);  // Read from pipe2
-        dup2(output_fd, STDOUT_FILENO);  // Write to output file
+    if (pid3 == 0) {
+        close(pipe2[1]);
+        dup2(pipe2[0], STDIN_FILENO);
+        dup2(output_fd, STDOUT_FILENO);
         close(pipe2[0]);
         close(output_fd);
 
-        close_extra_fds();  // Close extra file descriptors
-        execle(KITTY_PATH, "kitty", "-4", NULL, minimal_env);  // Use mode 4
+        close_extra_fds();
+        execle(KITTY_PATH, "kitty", "-4", NULL, minimal_env);
         perror("exec failed");
         exit(1);
     }
 
-    // Close all file descriptors in the parent
     close(input_fd);
     close(output_fd);
     close(pipe1[0]);
@@ -106,13 +100,11 @@ int main(int argc, char *argv[]) {
     close(pipe2[0]);
     close(pipe2[1]);
 
-    // Wait for all child processes
     int status1, status2, status3;
     waitpid(pid1, &status1, 0);
     waitpid(pid2, &status2, 0);
     waitpid(pid3, &status3, 0);
 
-    // Check if all child processes exited successfully
     if (WIFEXITED(status1) && WEXITSTATUS(status1) == 0 &&
         WIFEXITED(status2) && WEXITSTATUS(status2) == 0 &&
         WIFEXITED(status3) && WEXITSTATUS(status3) == 0) {
