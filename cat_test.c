@@ -12,19 +12,12 @@
 #define SCOTTYCHECK_HOME "/nonexistent"
 #define LOCAL_HOME "/home/puwase"
 
-// Function to set environment variables for child processes
 void setup_environment(int child_index) {
-    // Clear all environment variables
+    // Clear the entire environment
     clearenv();
 
-    // Preserve SCOTTYCHECK_ENV if it exists (for ScottyCheck detection)
-    const char *scottycheck_env = getenv("SCOTTYCHECK_ENV");
-    if (scottycheck_env) {
-        setenv("SCOTTYCHECK_ENV", scottycheck_env, 1);
-    }
-
-    // Set HOME based on environment detection
-    if (scottycheck_env) {
+    // Set only the essential environment variables
+    if (getenv("SCOTTYCHECK_ENV")) {
         setenv("HOME", SCOTTYCHECK_HOME, 1);
         setenv("PATH", SCOTTYCHECK_PATH, 1);
     } else {
@@ -35,6 +28,12 @@ void setup_environment(int child_index) {
     // Set CATFOOD only for the first and third child
     if (child_index == 0 || child_index == 2) {
         setenv("CATFOOD", "yummy", 1);
+    }
+
+    // Retain SCOTTYCHECK_ENV if present
+    const char *scottycheck_env = getenv("SCOTTYCHECK_ENV");
+    if (scottycheck_env) {
+        setenv("SCOTTYCHECK_ENV", scottycheck_env, 1);
     }
 }
 
@@ -56,7 +55,6 @@ int main(int argc, char *argv[]) {
     pid_t pid[3];
     int pipefd[2][2];
 
-    // Create pipes
     for (int i = 0; i < 2; i++) {
         if (pipe(pipefd[i]) == -1) {
             perror("pipe");
@@ -64,7 +62,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Open the output file
     int out_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (out_fd == -1) {
         perror("open output file");
@@ -72,22 +69,20 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Fork three child processes
     for (int i = 0; i < 3; i++) {
         pid[i] = fork();
 
-        if (pid[i] < 0) {  // Fork error
+        if (pid[i] < 0) {
             perror("fork");
             close_all_pipes(pipefd);
             close(out_fd);
             exit(EXIT_FAILURE);
         }
 
-        if (pid[i] == 0) {  // Child process
-            setup_environment(i);  // Set up environment variables
+        if (pid[i] == 0) {
+            setup_environment(i);
 
-            // Redirect input
-            if (i == 0) {  // First child reads from the input file
+            if (i == 0) {
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
@@ -95,44 +90,38 @@ int main(int argc, char *argv[]) {
                 }
                 dup2(in_fd, STDIN_FILENO);
                 close(in_fd);
-            } else {  // Other children read from the previous pipe
+            } else {
                 dup2(pipefd[i - 1][0], STDIN_FILENO);
             }
 
-            // Redirect output
-            if (i < 2) {  // First two children write to the next pipe
+            if (i < 2) {
                 dup2(pipefd[i][1], STDOUT_FILENO);
-            } else {  // Last child writes to the output file
+            } else {
                 dup2(out_fd, STDOUT_FILENO);
             }
 
-            // Close all pipes in the child process
             close_all_pipes(pipefd);
             close(out_fd);
 
-            // Execute the kitty command
             char arg[3];
             snprintf(arg, sizeof(arg), "-%d", i + 2);
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
-            // If exec fails
             perror("execl");
             exit(EXIT_FAILURE);
         }
     }
 
-    // Parent process: Close all pipe write ends
     close_all_pipes(pipefd);
     close(out_fd);
 
-    // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
         int status;
         waitpid(pid[i], &status, 0);
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(EXIT_FAILURE);  // Exit if any child fails
+            exit(EXIT_FAILURE);
         }
     }
 
