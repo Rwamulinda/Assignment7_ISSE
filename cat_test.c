@@ -5,15 +5,23 @@
 #include <string.h>
 #include <sys/wait.h>
 
-// Path to kitty
+// Path to kitty executable
 #define KITTY_PATH "/var/local/isse-07/kitty"
 
-// Function to close all unnecessary file descriptors
+// Function to close unnecessary file descriptors
 void close_extra_fds() {
     for (int fd = 3; fd < 1024; fd++) {
         close(fd);
     }
 }
+
+// Set up a minimal environment with required variables
+char *minimal_env[] = {
+    "PATH=/home/puwase",  // Ensure PATH contains the required string
+    "HOME=/home/puwase",  // Required HOME variable
+    "CATFOOD=yummy",       // CATFOOD variable needed for kitty -2
+    NULL                   // Null terminator for environment array
+};
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -48,14 +56,14 @@ int main(int argc, char *argv[]) {
 
     pid_t pid1 = fork();
     if (pid1 == 0) {  // Child 1
-        close(pipe1[0]);  // Close unused read end
+        close(pipe1[0]);  // Close read end of pipe1
         dup2(input_fd, STDIN_FILENO);  // Redirect input
-        dup2(pipe1[1], STDOUT_FILENO);  // Redirect output to pipe
+        dup2(pipe1[1], STDOUT_FILENO);  // Redirect output to pipe1
         close(input_fd);
         close(pipe1[1]);
 
         close_extra_fds();  // Close extra file descriptors
-        execl(KITTY_PATH, "kitty", "-0", NULL);  // Use mode 0 for no checks
+        execle(KITTY_PATH, "kitty", "-0", NULL, minimal_env);  // Use mode 0
         perror("exec failed");
         exit(1);
     }
@@ -69,9 +77,9 @@ int main(int argc, char *argv[]) {
         close(pipe1[0]);
         close(pipe2[1]);
 
-        setenv("CATFOOD", "yummy", 1);  // Set required environment variable
+        setenv("CATFOOD", "yummy", 1);  // Set CATFOOD environment variable
         close_extra_fds();  // Close extra file descriptors
-        execl(KITTY_PATH, "kitty", "-2", NULL);  // Use mode 2 for CATFOOD check
+        execle(KITTY_PATH, "kitty", "-2", NULL, minimal_env);  // Use mode 2
         perror("exec failed");
         exit(1);
     }
@@ -85,12 +93,12 @@ int main(int argc, char *argv[]) {
         close(output_fd);
 
         close_extra_fds();  // Close extra file descriptors
-        execl(KITTY_PATH, "kitty", "-4", NULL);  // Use mode 4 for strict environment checks
+        execle(KITTY_PATH, "kitty", "-4", NULL, minimal_env);  // Use mode 4
         perror("exec failed");
         exit(1);
     }
 
-    // Close all file descriptors in the parent process
+    // Close all file descriptors in the parent
     close(input_fd);
     close(output_fd);
     close(pipe1[0]);
