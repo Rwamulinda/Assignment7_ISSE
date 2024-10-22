@@ -10,6 +10,7 @@
 
 extern char **environ; // Access the environment variables
 
+// Close all pipe file descriptors
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][0]);
@@ -27,15 +28,26 @@ void filter_environment(int child_index) {
 
     int count = 0;
 
-    // Add PATH and HOME for every child
+    // Add '/home/puwase' to PATH if it's not already included
     const char *path = getenv("PATH");
-    const char *home = getenv("HOME");
+    const char *required_path = "/home/puwase";
+    size_t new_path_len;
 
-    if (path) {
-        new_environ[count] = malloc(strlen("PATH=") + strlen(path) + 1);
+    if (path && strstr(path, required_path) == NULL) {
+        new_path_len = strlen(required_path) + strlen(path) + 2;
+        new_environ[count] = malloc(strlen("PATH=") + new_path_len);
+        sprintf(new_environ[count++], "PATH=%s:%s", required_path, path);
+    } else if (path) {
+        new_path_len = strlen(path) + 1;
+        new_environ[count] = malloc(strlen("PATH=") + new_path_len);
         sprintf(new_environ[count++], "PATH=%s", path);
+    } else {
+        new_environ[count] = strdup("PATH=/home/puwase");
+        count++;
     }
 
+    // Add the HOME environment variable
+    const char *home = getenv("HOME");
     if (home) {
         new_environ[count] = malloc(strlen("HOME=") + strlen(home) + 1);
         sprintf(new_environ[count++], "HOME=%s", home);
