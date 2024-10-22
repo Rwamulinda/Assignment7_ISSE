@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
                 // You can add any other variables you want to unset here
                 for(int i = 0; environ[i]; i++) {
                     if(strcmp(environ[i] + 5, "HOME=") != 0 || strcmp(environ[i] + 5, "PATH=") != 0)
-                        unsetenv(environ[i])
+                        unsetenv(environ[i]);
                 }
                 setenv("CATFOOD", "yummy", 1);
             }
