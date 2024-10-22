@@ -57,12 +57,18 @@ int main(int argc, char *argv[]) {
             if (i == 0) { // kitty -2
                 setenv("CATFOOD", "yummy", 1);
                 unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
+                char *new_env[] = {"PATH=/usr/bin", "HOME=/home/puwase", "CATFOOD=yummy", NULL};
+                execlp(KITTY_EXEC, "kitty", "-2", NULL, new_env); 
             } else if (i == 1) { // kitty -3
-                unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
+                unsetenv("KITTYLITTER");
+                char *new_env[] = {"PATH=/usr/bin", "HOME=/home/puwase", NULL};
+                execlp(KITTY_EXEC, "kitty", "-3", NULL, new_env);
             } else if (i == 2) { // kitty -4
                 setenv("CATFOOD", "yummy", 1);
-                setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-                setenv("PATH", getenv("PATH"), 1); // Set PATH to parent's PATH
+                setenv("HOME", getenv("HOME"), 1);
+                setenv("PATH", getenv("PATH"), 1);
+                char *new_env[] = {"PATH=/usr/bin", "HOME=/home/puwase", "CATFOOD=yummy", NULL};
+                execlp(KITTY_EXEC, "kitty", "-4", NULL, new_env);
             }
 
             // Redirect input
@@ -70,7 +76,6 @@ int main(int argc, char *argv[]) {
                 int in_fd = open(input_file, O_RDONLY);
                 if (in_fd == -1) {
                     perror("open input file");
-                    close_all_pipes(pipefd);
                     exit(EXIT_FAILURE);
                 }
                 dup2(in_fd, STDIN_FILENO);
