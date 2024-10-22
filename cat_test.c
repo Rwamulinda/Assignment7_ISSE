@@ -57,10 +57,12 @@ int main(int argc, char *argv[]) {
             if (i == 0) { // First child (kitty -2)
                 setenv("CATFOOD", "yummy", 1);
                 unsetenv("KITTYLITTER");
-                dup2(pipefd[0][1], STDOUT_FILENO); // Redirect stdout to the first pipe
+
+                // Redirect stdout to the first pipe
+                dup2(pipefd[0][1], STDOUT_FILENO);
                 close(pipefd[0][0]); // Close read end of the first pipe
-                close(pipefd[1][0]); // Close unused read end of the second pipe
-                close(pipefd[1][1]); // Close unused write end of the second pipe
+                close(pipefd[1][0]); // Close read end of the second pipe
+                close(pipefd[1][1]); // Close write end of the second pipe
 
                 // Execute kitty -2
                 char *new_env[] = {
@@ -74,7 +76,7 @@ int main(int argc, char *argv[]) {
                 dup2(pipefd[0][0], STDIN_FILENO); // Read from first pipe
                 dup2(pipefd[1][1], STDOUT_FILENO); // Write to second pipe
                 close(pipefd[0][1]); // Close write end of the first pipe
-                close(pipefd[1][0]); // Close unused read end of the second pipe
+                close(pipefd[1][0]); // Close read end of the second pipe
 
                 // Execute kitty -3
                 char *new_env[] = {
@@ -109,6 +111,8 @@ int main(int argc, char *argv[]) {
     // Parent process: Close all pipe write ends
     close(pipefd[0][1]);
     close(pipefd[1][1]);
+    close(pipefd[0][0]); // Close read end of the first pipe
+    close(pipefd[1][0]); // Close read end of the second pipe
     close(out_fd); // Close output file in parent
 
     // Wait for all child processes to complete
