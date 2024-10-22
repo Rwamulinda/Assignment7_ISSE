@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <string.h>
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
@@ -12,14 +13,6 @@ void close_all_pipes(int pipefd[2][2]) {
         close(pipefd[i][0]);
         close(pipefd[i][1]);
     }
-}
-
-void clear_environment() {
-    extern char **environ;
-    for (int i = 0; environ[i] != NULL; i++) {
-        free(environ[i]); // Free existing environment variable strings
-    }
-    environ[0] = NULL; // Clear the environment
 }
 
 int main(int argc, char *argv[]) {
@@ -65,13 +58,22 @@ int main(int argc, char *argv[]) {
             if (i == 0) { // kitty -2
                 setenv("CATFOOD", "yummy", 1);
                 unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
+                setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
+                setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
             } else if (i == 1) { // kitty -3
                 unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
+                setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
+                setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
             } else if (i == 2) { // kitty -4
-                clear_environment(); // Clear existing environment variables
                 setenv("CATFOOD", "yummy", 1);
                 setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-                setenv("PATH", getenv("PATH"), 1); // Set PATH to parent's PATH
+                // Clear all other environment variables except the three needed
+                unsetenv("KITTYLITTER");
+                unsetenv("OLDPWD");
+                unsetenv("SHELL");
+                unsetenv("USER");
+                unsetenv("LOGNAME");
+                // You can add any other variables you want to unset here
             }
 
             // Redirect input
