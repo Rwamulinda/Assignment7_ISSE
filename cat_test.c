@@ -58,17 +58,17 @@ int main(int argc, char *argv[]) {
                 setenv("CATFOOD", "yummy", 1);
                 unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
                 char *new_env[] = {"PATH=/usr/bin", "HOME=/home/puwase", "CATFOOD=yummy", NULL};
-                execlp(KITTY_EXEC, "kitty", "-2", NULL, new_env); 
+                execle(KITTY_EXEC, "kitty", "-2", NULL, new_env);
             } else if (i == 1) { // kitty -3
                 unsetenv("KITTYLITTER");
                 char *new_env[] = {"PATH=/usr/bin", "HOME=/home/puwase", NULL};
-                execlp(KITTY_EXEC, "kitty", "-3", NULL, new_env);
+                execle(KITTY_EXEC, "kitty", "-3", NULL, new_env);
             } else if (i == 2) { // kitty -4
                 setenv("CATFOOD", "yummy", 1);
                 setenv("HOME", getenv("HOME"), 1);
                 setenv("PATH", getenv("PATH"), 1);
                 char *new_env[] = {"PATH=/usr/bin", "HOME=/home/puwase", "CATFOOD=yummy", NULL};
-                execlp(KITTY_EXEC, "kitty", "-4", NULL, new_env);
+                execle(KITTY_EXEC, "kitty", "-4", NULL, new_env);
             }
 
             // Redirect input
@@ -95,13 +95,8 @@ int main(int argc, char *argv[]) {
             close_all_pipes(pipefd);
             close(out_fd); // Ensure output file is closed
 
-            // Execute the kitty command
-            char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i + 2); // Correct command line argument
-            execl(KITTY_EXEC, "kitty", arg, NULL);
-
-            // If exec fails
-            perror("execl");
+            // If exec fails, exit
+            perror("execle");
             exit(EXIT_FAILURE);
         }
     }
