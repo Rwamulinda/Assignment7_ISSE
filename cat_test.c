@@ -8,13 +8,32 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
-extern char** environ;
+extern char **environ; // Declare environ to access environment variables
 
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][0]);
         close(pipefd[i][1]);
     }
+}
+
+void filter_environment(int child_index) {
+    // Create a new environment with only the required variables
+    char *new_environ[4] = {NULL}; // We will keep 3 env variables and one NULL terminator
+    int count = 0;
+
+    // Check the current environment and retain only needed variables
+    for (char **env = environ; *env != NULL; env++) {
+        if (strstr(*env, "HOME=") == *env || 
+            (child_index == 0 && strstr(*env, "CATFOOD=") == *env) || 
+            (child_index == 1 && strstr(*env, "KITTYLITTER=") == *env)) {
+            new_environ[count++] = *env;
+        }
+    }
+
+    // Set the filtered environment for the child
+    new_environ[count] = NULL; // Terminate the array
+    environ = new_environ; // Redirect environ to the new environment
 }
 
 int main(int argc, char *argv[]) {
@@ -56,29 +75,16 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid[i] == 0) { // Child process
-            // Set environment variables according to the child
+            // Filter environment variables for the child
+            filter_environment(i);
+
+            // Set specific environment variables according to the child
             if (i == 0) { // kitty -2
                 setenv("CATFOOD", "yummy", 1);
-                setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
-                setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
+                unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
             } else if (i == 1) { // kitty -3
                 unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
-                setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
-                setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
             } else if (i == 2) { // kitty -4
-                
-                // setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-                // // Clear all other environment variables except the three needed
-                // unsetenv("KITTYLITTER");
-                // unsetenv("OLDPWD");
-                // unsetenv("SHELL");
-                // unsetenv("USER");
-                // unsetenv("LOGNAME");
-                // You can add any other variables you want to unset here
-                for(int i = 0; environ[i]; i++) {
-                    if(strcmp(environ[i] + 5, "HOME=") != 0 || strcmp(environ[i] + 5, "PATH=") != 0)
-                        unsetenv(environ[i]);
-                }
                 setenv("CATFOOD", "yummy", 1);
             }
 
