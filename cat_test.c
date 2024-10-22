@@ -8,6 +8,8 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
+extern char** environ;
+
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][0]);
@@ -57,7 +59,6 @@ int main(int argc, char *argv[]) {
             // Set environment variables according to the child
             if (i == 0) { // kitty -2
                 setenv("CATFOOD", "yummy", 1);
-                unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
                 setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
                 setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
             } else if (i == 1) { // kitty -3
@@ -65,15 +66,20 @@ int main(int argc, char *argv[]) {
                 setenv("HOME", getenv("HOME"), 1); // Ensure HOME is set
                 setenv("PATH", getenv("PATH"), 1); // Ensure PATH is set
             } else if (i == 2) { // kitty -4
-                setenv("CATFOOD", "yummy", 1);
-                setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
-                // Clear all other environment variables except the three needed
-                unsetenv("KITTYLITTER");
-                unsetenv("OLDPWD");
-                unsetenv("SHELL");
-                unsetenv("USER");
-                unsetenv("LOGNAME");
+                
+                // setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
+                // // Clear all other environment variables except the three needed
+                // unsetenv("KITTYLITTER");
+                // unsetenv("OLDPWD");
+                // unsetenv("SHELL");
+                // unsetenv("USER");
+                // unsetenv("LOGNAME");
                 // You can add any other variables you want to unset here
+                for(int i = 0; environ[i]; i++) {
+                    if(strcmp(environ[i] + 5, "HOME=") != 0 || strcmp(environ[i] + 5, "PATH=") != 0)
+                        unsetenv(environ[i])
+                }
+                setenv("CATFOOD", "yummy", 1);
             }
 
             // Redirect input
