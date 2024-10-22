@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     pid_t pid1 = fork();
     if (pid1 == 0) {
         freopen(inputfile, "r", stdin);  // Redirect input
-        execlp(kitty_path, "kitty", NULL);
+        execlp(kitty_path, "kitty", "-n", "0", NULL);  // Pass mode 0
         perror("execlp failed");
         exit(1);
     }
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     // Second child process
     pid_t pid2 = fork();
     if (pid2 == 0) {
-        execlp(kitty_path, "kitty", NULL);
+        execlp(kitty_path, "kitty", "-n", "1", NULL);  // Pass mode 1
         perror("execlp failed");
         exit(1);
     }
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     pid_t pid3 = fork();
     if (pid3 == 0) {
         freopen(outputfile, "w", stdout);  // Redirect output
-        execlp(kitty_path, "kitty", NULL);
+        execlp(kitty_path, "kitty", "-n", "2", NULL);  // Pass mode 2
         perror("execlp failed");
         exit(1);
     }
