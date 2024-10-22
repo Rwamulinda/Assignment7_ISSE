@@ -8,7 +8,7 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
-extern char **environ; // Access environment variables
+extern char **environ; // Accessing  environment variables using environ
 
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
@@ -16,15 +16,13 @@ void close_all_pipes(int pipefd[2][2]) {
         close(pipefd[i][1]);
     }
 }
-
-// Create a modified environment for each child process
 char **create_environment(int child_index) {
-    // Count the number of existing environment variables
+    // Counting the existing environment variables
     int env_count = 0;
     while (environ[env_count]) env_count++;
 
     char **new_environ;
-    if (child_index == 2) {  // For "kitty -4": Only PATH, HOME, and CATFOOD
+    if (child_index == 2) {  // For "kitty -4": Only PATH, HOME, and CATFOOD clarifying the path needed
         new_environ = calloc(4, sizeof(char *));
         if (!new_environ) {
             perror("calloc");
@@ -81,7 +79,7 @@ int main(int argc, char *argv[]) {
     pid_t pid[3];
     int pipefd[2][2];
 
-    // Create pipes
+    // Creating pipes
     for (int i = 0; i < 2; i++) {
         if (pipe(pipefd[i]) == -1) {
             perror("pipe");
@@ -89,7 +87,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Open the output file
+    // Opening the output file
     int out_fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (out_fd == -1) {
         perror("open output file");
@@ -97,7 +95,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Fork three child processes
+    // creating the Fork for three child processes
     for (int i = 0; i < 3; i++) {
         pid[i] = fork();
 
