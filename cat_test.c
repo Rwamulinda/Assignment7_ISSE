@@ -18,22 +18,26 @@ void close_all_pipes(int pipefd[2][2]) {
 }
 
 void filter_environment(int child_index) {
-    // Create a new environment with only the required variables
-    char *new_environ[4] = {NULL}; // We will keep 3 env variables and one NULL terminator
+    // Allocate space for up to 4 environment variables (3 + 1 NULL terminator)
+    char **new_environ = calloc(4, sizeof(char *));
+    if (new_environ == NULL) {
+        perror("calloc");
+        exit(EXIT_FAILURE);
+    }
+
     int count = 0;
 
     // Check the current environment and retain only needed variables
     for (char **env = environ; *env != NULL; env++) {
-        if (strstr(*env, "HOME=") == *env || 
-            (child_index == 0 && strstr(*env, "CATFOOD=") == *env) || 
+        if (strstr(*env, "HOME=") == *env ||
+            (child_index == 0 && strstr(*env, "CATFOOD=") == *env) ||
             (child_index == 1 && strstr(*env, "KITTYLITTER=") == *env)) {
             new_environ[count++] = *env;
         }
     }
 
-    // Set the filtered environment for the child
     new_environ[count] = NULL; // Terminate the array
-    environ = new_environ; // Redirect environ to the new environment
+    environ = new_environ;      // Redirect environ to the new environment
 }
 
 int main(int argc, char *argv[]) {
@@ -81,9 +85,9 @@ int main(int argc, char *argv[]) {
             // Set specific environment variables according to the child
             if (i == 0) { // kitty -2
                 setenv("CATFOOD", "yummy", 1);
-                unsetenv("KITTYLITTER"); // Remove KITTYLITTER if set
+                unsetenv("KITTYLITTER");
             } else if (i == 1) { // kitty -3
-                unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
+                unsetenv("KITTYLITTER");
             } else if (i == 2) { // kitty -4
                 setenv("CATFOOD", "yummy", 1);
             }
@@ -97,7 +101,7 @@ int main(int argc, char *argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 dup2(in_fd, STDIN_FILENO);
-                close(in_fd);  // Close after redirection
+                close(in_fd);
             } else { // Other children read from the previous pipe
                 dup2(pipefd[i - 1][0], STDIN_FILENO);
             }
@@ -111,11 +115,11 @@ int main(int argc, char *argv[]) {
 
             // Close all pipes in the child process
             close_all_pipes(pipefd);
-            close(out_fd); // Ensure output file is closed
+            close(out_fd);
 
             // Execute the kitty command
             char arg[3];
-            snprintf(arg, sizeof(arg), "-%d", i + 2); // Correct command line argument
+            snprintf(arg, sizeof(arg), "-%d", i + 2);
             execl(KITTY_EXEC, "kitty", arg, NULL);
 
             // If exec fails
@@ -126,7 +130,7 @@ int main(int argc, char *argv[]) {
 
     // Parent process: Close all pipe write ends
     close_all_pipes(pipefd);
-    close(out_fd); // Close output file in parent
+    close(out_fd);
 
     // Wait for all child processes to complete
     for (int i = 0; i < 3; i++) {
@@ -135,7 +139,7 @@ int main(int argc, char *argv[]) {
 
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child %d exited with status %d\n", i, WEXITSTATUS(status));
-            exit(EXIT_FAILURE); // Exit if any child fails
+            exit(EXIT_FAILURE);
         }
     }
 
