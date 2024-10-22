@@ -8,7 +8,7 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
-extern char **environ; // Declare environ to access environment variables
+extern char **environ; // Access the environment variables
 
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
@@ -17,8 +17,8 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
+// Filter and set the correct environment variables for each child
 void filter_environment(int child_index) {
-    // Allocate space for up to 4 environment variables (3 + 1 NULL terminator)
     char **new_environ = calloc(4, sizeof(char *));
     if (new_environ == NULL) {
         perror("calloc");
@@ -27,17 +27,30 @@ void filter_environment(int child_index) {
 
     int count = 0;
 
-    // Check the current environment and retain only needed variables
-    for (char **env = environ; *env != NULL; env++) {
-        if (strstr(*env, "HOME=") == *env ||
-            (child_index == 0 && strstr(*env, "CATFOOD=") == *env) ||
-            (child_index == 1 && strstr(*env, "KITTYLITTER=") == *env)) {
-            new_environ[count++] = *env;
-        }
+    // Add PATH and HOME for every child
+    const char *path = getenv("PATH");
+    const char *home = getenv("HOME");
+
+    if (path) {
+        new_environ[count] = malloc(strlen("PATH=") + strlen(path) + 1);
+        sprintf(new_environ[count++], "PATH=%s", path);
     }
 
-    new_environ[count] = NULL; // Terminate the array
-    environ = new_environ;      // Redirect environ to the new environment
+    if (home) {
+        new_environ[count] = malloc(strlen("HOME=") + strlen(home) + 1);
+        sprintf(new_environ[count++], "HOME=%s", home);
+    }
+
+    // Add CATFOOD only for child 2 (kitty -4)
+    if (child_index == 2) {
+        new_environ[count] = strdup("CATFOOD=yummy");
+        count++;
+    }
+
+    new_environ[count] = NULL; // Null-terminate the environment array
+
+    // Replace the current environment with the new environment
+    environ = new_environ;
 }
 
 int main(int argc, char *argv[]) {
@@ -79,18 +92,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (pid[i] == 0) { // Child process
-            // Filter environment variables for the child
-            filter_environment(i);
-
-            // Set specific environment variables according to the child
-            if (i == 0) { // kitty -2
-                setenv("CATFOOD", "yummy", 1);
-                unsetenv("KITTYLITTER");
-            } else if (i == 1) { // kitty -3
-                unsetenv("KITTYLITTER");
-            } else if (i == 2) { // kitty -4
-                setenv("CATFOOD", "yummy", 1);
-            }
+            filter_environment(i); // Set the correct environment for the child
 
             // Redirect input
             if (i == 0) { // First child reads from the input file
