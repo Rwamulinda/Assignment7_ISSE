@@ -8,10 +8,8 @@
 
 #define KITTY_EXEC "/var/local/isse-07/kitty"
 
-extern char **environ; // Accessing the envirnoment variableable using environ 
+extern char **environ; // Access environment variables
 
-
-// closing all the pipes
 void close_all_pipes(int pipefd[2][2]) {
     for (int i = 0; i < 2; i++) {
         close(pipefd[i][0]);
@@ -19,14 +17,14 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
-// Creating a modified environment for each child process
+// Create a modified environment for each child process
 char **create_environment(int child_index) {
-    
-    int env_count = 0; // counting the existing environment
+    // Count the number of existing environment variables
+    int env_count = 0;
     while (environ[env_count]) env_count++;
 
     char **new_environ;
-    if (child_index == 2) 
+    if (child_index == 2) {  // For "kitty -4": Only PATH, HOME, and CATFOOD
         new_environ = calloc(4, sizeof(char *));
         if (!new_environ) {
             perror("calloc");
@@ -43,11 +41,11 @@ char **create_environment(int child_index) {
         new_environ[1] = malloc(strlen("HOME=") + strlen(home) + 1);
         sprintf(new_environ[1], "HOME=%s", home);
 
-        // Add CATFOOD environment
+        // Add CATFOOD
         new_environ[2] = strdup("CATFOOD=yummy");
         new_environ[3] = NULL; // Null-terminate
     } 
-    else {  // For "kitty 2" and "kitty 3"
+    else {  // For "kitty -2" and "kitty -3"
         new_environ = calloc(env_count + 2, sizeof(char *));
         if (!new_environ) {
             perror("calloc");
@@ -57,7 +55,7 @@ char **create_environment(int child_index) {
         int j = 0;
         for (int i = 0; i < env_count; i++) {
             if (child_index == 1 && strstr(environ[i], "KITTYLITTER=")) {
-                continue;  // Skipping the  KITTYLITTER for "kitty -3"
+                continue;  // Skip KITTYLITTER for "kitty -3"
             }
             new_environ[j++] = strdup(environ[i]);
         }
