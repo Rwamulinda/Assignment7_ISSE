@@ -14,6 +14,10 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
+void print_debug_info(int process_number, const char *action) {
+    printf("Process %d: %s\n", process_number, action);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
@@ -55,11 +59,11 @@ int main(int argc, char *argv[]) {
         if (pid[i] == 0) { // Child process
             // Redirect input/output
             if (i == 0) { // First child (kitty -2)
+                print_debug_info(i + 1, "Starting kitty -2");
                 setenv("CATFOOD", "yummy", 1);
                 unsetenv("KITTYLITTER");
 
-                // Redirect stdout to the first pipe
-                dup2(pipefd[0][1], STDOUT_FILENO);
+                dup2(pipefd[0][1], STDOUT_FILENO); // Redirect stdout to the first pipe
                 close(pipefd[0][0]); // Close read end of the first pipe
                 close(pipefd[1][0]); // Close read end of the second pipe
                 close(pipefd[1][1]); // Close write end of the second pipe
@@ -73,6 +77,7 @@ int main(int argc, char *argv[]) {
                 };
                 execle(KITTY_EXEC, "kitty", "-2", NULL, new_env);
             } else if (i == 1) { // Second child (kitty -3)
+                print_debug_info(i + 1, "Starting kitty -3");
                 dup2(pipefd[0][0], STDIN_FILENO); // Read from first pipe
                 dup2(pipefd[1][1], STDOUT_FILENO); // Write to second pipe
                 close(pipefd[0][1]); // Close write end of the first pipe
@@ -86,6 +91,7 @@ int main(int argc, char *argv[]) {
                 };
                 execle(KITTY_EXEC, "kitty", "-3", NULL, new_env);
             } else if (i == 2) { // Third child (kitty -4)
+                print_debug_info(i + 1, "Starting kitty -4");
                 dup2(pipefd[1][0], STDIN_FILENO); // Read from second pipe
                 dup2(out_fd, STDOUT_FILENO); // Write to output file
                 close(pipefd[0][0]); // Close read end of the first pipe
