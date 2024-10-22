@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/wait.h>  // Required for waitpid()
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -17,10 +18,7 @@ int main(int argc, char *argv[]) {
     // First child process
     pid_t pid1 = fork();
     if (pid1 == 0) {
-        // Redirect input to the input file
-        freopen(inputfile, "r", stdin);
-
-        // Execute the first kitty instance
+        freopen(inputfile, "r", stdin);  // Redirect input
         execlp(kitty_path, "kitty", NULL);
         perror("execlp failed");
         exit(1);
@@ -29,7 +27,6 @@ int main(int argc, char *argv[]) {
     // Second child process
     pid_t pid2 = fork();
     if (pid2 == 0) {
-        // Execute the second kitty instance
         execlp(kitty_path, "kitty", NULL);
         perror("execlp failed");
         exit(1);
@@ -38,10 +35,7 @@ int main(int argc, char *argv[]) {
     // Third child process
     pid_t pid3 = fork();
     if (pid3 == 0) {
-        // Redirect output to the output file
-        freopen(outputfile, "w", stdout);
-
-        // Execute the third kitty instance
+        freopen(outputfile, "w", stdout);  // Redirect output
         execlp(kitty_path, "kitty", NULL);
         perror("execlp failed");
         exit(1);
