@@ -3,113 +3,116 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <errno.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
-#define KITTY_PATH "/var/local/isse-07/kitty"
+// Error checking macro
+#define CHECK(expr, msg) \
+    if ((expr) == -1) { perror(msg); exit(1); }
 
-void close_extra_fds() {
-    for (int fd = 3; fd < 1024; fd++) {
-        close(fd);
+// Function to set up environment variables for each child process
+char **set_env_for_kitty(int kitty_number, char *envp[]) {
+    extern char **environ;
+    char **new_env;
+
+    switch (kitty_number) {
+        case 2:
+            new_env = environ;
+            setenv("CATFOOD", "yummy", 1);  // Add CATFOOD=yummy
+            break;
+        case 3:
+            new_env = environ;
+            unsetenv("KITTYLITTER");  // Remove KITTYLITTER
+            break;
+        case 4:
+            // Create a restricted environment
+            new_env = (char **)malloc(4 * sizeof(char *));
+            new_env[0] = getenv("PATH");
+            new_env[1] = getenv("HOME");
+            new_env[2] = strdup("CATFOOD=yummy");
+            new_env[3] = NULL;
+            break;
+    }
+    return new_env;
+}
+
+// Function to fork and exec each kitty process
+void start_kitty(int kitty_number, int in_fd, int out_fd, char *envp[]) {
+    pid_t pid = fork();
+    CHECK(pid, "fork");
+
+    if (pid == 0) {  // Child process
+        // Redirect stdin and stdout
+        if (in_fd != STDIN_FILENO) {
+            dup2(in_fd, STDIN_FILENO);
+            close(in_fd);
+        }
+        if (out_fd != STDOUT_FILENO) {
+            dup2(out_fd, STDOUT_FILENO);
+            close(out_fd);
+        }
+
+        // Prepare the environment
+        char **new_env = set_env_for_kitty(kitty_number, envp);
+
+        // Execute the kitty process
+        char cmd[10];
+        snprintf(cmd, sizeof(cmd), "kitty -%d", kitty_number);
+        execlp("kitty", "kitty", cmd, (char *)NULL);
+        perror("execlp failed");  // If execlp fails
+        exit(1);
     }
 }
 
-char *minimal_env[] = {
-    "PATH=/home/puwase",
-    "HOME=/home/puwase",
-    "CATFOOD=yummy",
-    "SHELL=/bin/bash",  // Add common environment variables
-    "USER=puwase",
-    NULL
-};
-
-int main(int argc, char *argv[]) {
+// Main function
+int main(int argc, char *argv[], char *envp[]) {
     if (argc != 3) {
-        fprintf(stderr, "Usage: %s inputfile outputfile\n", argv[0]);
-        return 1;
+        fprintf(stderr, "Usage: %s <inputfile> <outputfile>\n", argv[0]);
+        exit(1);
     }
 
+    // Ensure input and output files are different
     if (strcmp(argv[1], argv[2]) == 0) {
-        fprintf(stderr, "Input and output files must be different.\n");
-        return 1;
+        fprintf(stderr, "Error: inputfile and outputfile must be different.\n");
+        exit(1);
     }
 
+    // Open input and output files
     int input_fd = open(argv[1], O_RDONLY);
-    if (input_fd < 0) {
-        perror("Error opening input file");
-        return 1;
-    }
-
+    CHECK(input_fd, "open input file");
     int output_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (output_fd < 0) {
-        perror("Error opening output file");
-        close(input_fd);
-        return 1;
-    }
+    CHECK(output_fd, "open output file");
 
+    // Set up pipes
     int pipe1[2], pipe2[2];
-    pipe(pipe1);
-    pipe(pipe2);
+    CHECK(pipe(pipe1), "pipe1");
+    CHECK(pipe(pipe2), "pipe2");
 
-    pid_t pid1 = fork();
-    if (pid1 == 0) {
-        close(pipe1[0]);
-        dup2(input_fd, STDIN_FILENO);
-        dup2(pipe1[1], STDOUT_FILENO);
-        close(input_fd);
-        close(pipe1[1]);
-
-        close_extra_fds();
-        execle(KITTY_PATH, "kitty", "-0", NULL, minimal_env);
-        perror("exec failed");
-        exit(1);
-    }
-
-    pid_t pid2 = fork();
-    if (pid2 == 0) {
-        close(pipe1[1]);
-        close(pipe2[0]);
-        dup2(pipe1[0], STDIN_FILENO);
-        dup2(pipe2[1], STDOUT_FILENO);
-        close(pipe1[0]);
-        close(pipe2[1]);
-
-        close_extra_fds();
-        execle(KITTY_PATH, "kitty", "-3", NULL, minimal_env);  // Use -3 here
-        perror("exec failed");
-        exit(1);
-    }
-
-    pid_t pid3 = fork();
-    if (pid3 == 0) {
-        close(pipe2[1]);
-        dup2(pipe2[0], STDIN_FILENO);
-        dup2(output_fd, STDOUT_FILENO);
-        close(pipe2[0]);
-        close(output_fd);
-
-        close_extra_fds();
-        execle(KITTY_PATH, "kitty", "-4", NULL, minimal_env);
-        perror("exec failed");
-        exit(1);
-    }
-
+    // Start kitty -2
+    start_kitty(2, input_fd, pipe1[1], envp);
     close(input_fd);
-    close(output_fd);
-    close(pipe1[0]);
     close(pipe1[1]);
-    close(pipe2[0]);
+
+    // Start kitty -3
+    start_kitty(3, pipe1[0], pipe2[1], envp);
+    close(pipe1[0]);
     close(pipe2[1]);
 
-    int status1, status2, status3;
-    waitpid(pid1, &status1, 0);
-    waitpid(pid2, &status2, 0);
-    waitpid(pid3, &status3, 0);
+    // Start kitty -4
+    start_kitty(4, pipe2[0], output_fd, envp);
+    close(pipe2[0]);
+    close(output_fd);
 
-    if (WIFEXITED(status1) && WEXITSTATUS(status1) == 0 &&
-        WIFEXITED(status2) && WEXITSTATUS(status2) == 0 &&
-        WIFEXITED(status3) && WEXITSTATUS(status3) == 0) {
-        return 0;
-    } else {
-        return 1;
+    // Wait for all children to complete
+    int status;
+    int exit_code = 0;
+    for (int i = 0; i < 3; i++) {
+        wait(&status);
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+            exit_code = 1;
+        }
     }
+
+    return exit_code;
 }
