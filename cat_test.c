@@ -14,6 +14,14 @@ void close_all_pipes(int pipefd[2][2]) {
     }
 }
 
+void clear_environment() {
+    extern char **environ;
+    for (int i = 0; environ[i] != NULL; i++) {
+        free(environ[i]); // Free existing environment variable strings
+    }
+    environ[0] = NULL; // Clear the environment
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
@@ -60,6 +68,7 @@ int main(int argc, char *argv[]) {
             } else if (i == 1) { // kitty -3
                 unsetenv("KITTYLITTER"); // Ensure KITTYLITTER is unset
             } else if (i == 2) { // kitty -4
+                clear_environment(); // Clear existing environment variables
                 setenv("CATFOOD", "yummy", 1);
                 setenv("HOME", getenv("HOME"), 1); // Set HOME to parent's HOME
                 setenv("PATH", getenv("PATH"), 1); // Set PATH to parent's PATH
